@@ -187,6 +187,8 @@ RUN echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"
 
 RUN echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null" >> /var/spool/cron/crontabs/root
 
+RUN echo "cd /home" >> /root/.bashrc
+
 ENV WEBSITE_ROLE_INSTANCE_ID localRoleInstance
 ENV WEBSITE_INSTANCE_ID localInstance
 COPY --chown=www-data:www-data wp-config-docker.php /usr/src/wordpress/

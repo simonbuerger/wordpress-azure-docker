@@ -96,6 +96,8 @@ if [[ "$1" == apache2* ]] || [ "$1" = 'php-fpm' ]; then
 	fi
 fi
 
+eval $(printenv | sed -n "s/^\([^=]\+\)=\(.*\)$/export \1=\2/p" | sed 's/"/\\\"/g' | sed '/=/s//="/' | sed 's/$/"/' >> /etc/profile)
+
 mkdir -p /home/LogFiles/apache2
 mkdir -p /home/LogFiles/archive
 echo "Starting Cron ..."

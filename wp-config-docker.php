@@ -36,6 +36,18 @@ function getenv_docker($env, $default) {
 	}
 }
 
+// CDN host name config - add HOST_NAME as a slot setting in app service app settings
+
+$envDomain = getenv('HOST_DOMAIN');
+if ($envDomain) {
+$_SERVER['HTTP_HOST'] = $envDomain;
+}
+
+$domain = filter_input(INPUT_SERVER, 'HTTP_HOST', FILTER_SANITIZE_STRING);
+if ($envDomain) {
+$domain = $envDomain;
+}
+
 $value = getenv("MYSQLCONNSTR_defaultConnection");
 
 $connectstr_dbhost = preg_replace("/^.*Data Source=(.+?);.*$/", "\\1", $value);
@@ -115,6 +127,13 @@ if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROT
 if ($configExtra = getenv_docker('WORDPRESS_CONFIG_EXTRA', '')) {
 	eval($configExtra);
 }
+
+define('WP_HOME','https://'. $domain);
+define('WP_SITEURL','https://'. $domain);
+
+//Relative URLs for swapping across app service deployment slots
+define('WP_CONTENT_URL', '/wp-content');
+define('DOMAIN_CURRENT_SITE', $domain);
 
 /* That's all, stop editing! Happy publishing. */
 
