@@ -183,9 +183,9 @@ RUN chmod -R +x /tmp/ssh_setup.sh \
 	 && rm -rf /tmp/*
 COPY logrotate.d /etc/logrotate.d
 
-RUN echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/home/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1" >> /var/spool/cron/crontabs/root
+RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/home/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
 
-RUN echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null" >> /var/spool/cron/crontabs/root
+RUN (crontab -l -u root; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
 
 RUN echo "cd /home" >> /root/.bashrc
 

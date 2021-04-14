@@ -1,0 +1,11 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_URI} !(.*)/$
+    RewriteRule ^(.*)$ https://www.clover.co.za/$1/ [L,R=301,NC]
+    RewriteCond %{HTTP_HOST} !^www.clover.co.za$ [NC]
+    RewriteCond %{HTTP:X-Forwarded-Host} !^www.clover.co.za$ [NC]
+    RewriteCond %{HTTP_HOST} ^live-clover-co-za-v2.azurewebsites.net$ [NC]
+    RewriteCond %{REQUEST_URI} !^live-clover-co-za-v2-uat.azurewebsites.net$ [NC]
+    RewriteRule ^(.*)$ https://www.clover.co.za/$1 [L,R=301,NC]
+</IfModule>
