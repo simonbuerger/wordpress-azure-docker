@@ -111,7 +111,20 @@ RUN { \
 	} > /usr/local/etc/php/conf.d/error-logging.ini
 
 RUN set -eux; \
-	a2enmod rewrite expires; \
+	a2enmod rewrite expires headers; \
+  	{ \
+		echo 'ServerSignature Off'; \
+# these IP ranges are reserved for "private" use and should thus *usually* be safe inside Docker
+		echo 'ServerTokens Prod'; \
+		echo 'DocumentRoot /home/site/wwwroot'; \
+		echo 'DirectoryIndex default.htm default.html index.htm index.html index.php hostingstart.html'; \
+		echo 'CustomLog /dev/null combined'; \
+		echo '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">'; \
+		echo '   SetHandler application/x-httpd-php'; \
+		echo '</FilesMatch>'; \
+		echo 'EnableMMAP Off'; \
+	} >> /etc/apache2/apache2.conf; \
+  rm -rf /etc/apache2/sites-available/000-default.conf; \
 	\
 # https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
 	a2enmod remoteip; \
