@@ -121,6 +121,11 @@ define( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );
 // see also http://codex.wordpress.org/Administration_Over_SSL#Using_a_Reverse_Proxy
 if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
 	$_SERVER['HTTPS'] = 'on';
+  define('WP_HOME','https://'. $domain);
+  define('WP_SITEURL','https://'. $domain);
+} else {
+  define('WP_HOME','http://'. $domain);
+  define('WP_SITEURL','http://'. $domain);
 }
 // (we include this by default because reverse proxying is extremely common in container environments)
 
@@ -128,8 +133,6 @@ if ($configExtra = getenv_docker('WORDPRESS_CONFIG_EXTRA', '')) {
 	eval($configExtra);
 }
 
-define('WP_HOME','https://'. $domain);
-define('WP_SITEURL','https://'. $domain);
 
 //Relative URLs for swapping across app service deployment slots
 define('WP_CONTENT_URL', '/wp-content');
