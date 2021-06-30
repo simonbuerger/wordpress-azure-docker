@@ -1,9 +1,3 @@
-#
-# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh"
-#
-# PLEASE DO NOT EDIT IT DIRECTLY.
-#
-
 FROM php:7.4-apache
 
 # persistent dependencies
@@ -18,6 +12,7 @@ RUN set -eux; \
 		curl \
 		logrotate \
 		mariadb-client \
+    gnupg2 \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
@@ -61,8 +56,10 @@ RUN set -ex; \
 	; \
 	pecl install imagick-3.4.4; \
 	pecl install redis; \
+  pecl install mysqlnd_azure; \
 	docker-php-ext-enable imagick; \
 	docker-php-ext-enable redis; \
+	docker-php-ext-enable mysqlnd_azure; \
 	rm -r /tmp/pear; \
 	\
 # reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
@@ -84,10 +81,10 @@ RUN set -ex; \
 RUN set -eux; \
 	docker-php-ext-enable opcache; \
 	{ \
-		echo 'opcache.memory_consumption=256'; \
+		echo 'opcache.memory_consumption=192'; \
 		echo 'opcache.interned_strings_buffer=16'; \
 		echo 'opcache.max_accelerated_files=8000'; \
-		echo 'opcache.revalidate_freq=2'; \
+		echo 'opcache.revalidate_freq=30'; \
 		echo 'opcache.fast_shutdown=1'; \
 	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
 # https://wordpress.org/support/article/editing-wp-config-php/#configure-error-logging
@@ -112,19 +109,20 @@ RUN { \
 
 RUN set -eux; \
 	a2enmod rewrite expires headers; \
+	echo 'CustomLog /dev/stdout combined' > /etc/apache2/conf-enabled/other-vhosts-access-log.conf; \
   	{ \
 		echo 'ServerSignature Off'; \
 # these IP ranges are reserved for "private" use and should thus *usually* be safe inside Docker
 		echo 'ServerTokens Prod'; \
 		echo 'DocumentRoot /home/site/wwwroot'; \
 		echo 'DirectoryIndex default.htm default.html index.htm index.html index.php hostingstart.html'; \
-		echo 'CustomLog /dev/null combined'; \
+		echo 'CustomLog /dev/stdout combined'; \
 		echo '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">'; \
 		echo '   SetHandler application/x-httpd-php'; \
 		echo '</FilesMatch>'; \
 		echo 'EnableMMAP Off'; \
 	} >> /etc/apache2/apache2.conf; \
-  rm -rf /etc/apache2/sites-available/000-default.conf; \
+  rm -rf /etc/apache2/sites-enabled/000-default.conf; \
 	\
 # https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
 	a2enmod remoteip; \
@@ -180,6 +178,20 @@ RUN set -eux; \
 	chown -R www-data:www-data wp-content; \
 	chmod -R 777 wp-content
 
+RUN \
+  echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list; \
+  wget -O- https://download.newrelic.com/548C16BF.gpg | apt-key add -; \
+  apt-get update; \
+  apt-get -y install newrelic-php5; \
+  NR_INSTALL_SILENT=1 newrelic-install install; \
+  sed -i -e "s/REPLACE_WITH_REAL_KEY/\${NEWRELIC_KEY}/" \
+  -e "s/newrelic.appname[[:space:]]=[[:space:]].*/newrelic.appname=\"\${WEBSITE_HOSTNAME}\"/" \
+  -e '$anewrelic.distributed_tracing_enabled=true' \
+  -e '$anewrelic.framework.wordpress.hooks=true' \
+  -e '$anewrelic.daemon.start_timeout=5s' \
+  -e '$anewrelic.daemon.app_connect_timeout=10s' \
+  $(php -r "echo(PHP_CONFIG_FILE_SCAN_DIR);")/newrelic.ini
+
 RUN echo "root:Docker!" | chpasswd
 RUN mkdir -p /home/LogFiles/apache2
 ENV APACHE_LOG_DIR=/home/LogFiles/apache2
@@ -195,6 +207,8 @@ RUN chmod -R +x /tmp/ssh_setup.sh \
 	 && (sleep 1;/tmp/ssh_setup.sh 2>&1 > /dev/null) \
 	 && rm -rf /tmp/*
 COPY logrotate.d /etc/logrotate.d
+COPY zmysqlnd_azure.ini /usr/local/etc/php/conf.d/
+COPY DigiCertGlobalRootG2.crt.pem /usr/
 
 RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/home/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
 

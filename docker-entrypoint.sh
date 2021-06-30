@@ -70,7 +70,8 @@ if [[ "$1" == apache2* ]] || [ "$1" = 'php-fpm' ]; then
 	fi
 
 	wpEnvs=( "${!WORDPRESS_@}" )
-	if [ ! -s wp-config.php ] && [ "${#wpEnvs[@]}" -gt 0 ]; then
+  echo "$PWD"
+	if [ ! -s wp-config.php ]; then
 		for wpConfigDocker in \
 			wp-config-docker.php \
 			/usr/src/wordpress/wp-config-docker.php \

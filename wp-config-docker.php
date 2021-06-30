@@ -48,6 +48,25 @@ if ($envDomain) {
 $domain = $envDomain;
 }
 
+define('DISABLE_WP_CRON', true);
+define('WP_CACHE', true);
+
+// Redis settings
+define('WP_REDIS_SCHEME', 'tls');
+define('WP_REDIS_CLIENT', 'pecl');
+define('WP_REDIS_HOST', getenv('WP_REDIS_HOST'));
+define('WP_REDIS_PORT', '6380');
+define('WP_REDIS_TIMEOUT', 30);
+define('WP_REDIS_DATABASE', 1);
+define('WP_REDIS_PASSWORD', getenv('WP_REDIS_PASSWORD'));
+define('WP_CACHE_KEY_SALT', getenv('WEBSITE_HOSTNAME'));
+
+
+// MySQL config
+define('MYSQL_CLIENT_FLAGS', MYSQLI_CLIENT_SSL | MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT);
+define('MYSQL_SSL_CA', '/usr/DigiCertGlobalRootG2.crt.pem');
+define('USE_PCONNECT', true);
+
 $value = getenv("MYSQLCONNSTR_defaultConnection");
 
 $connectstr_dbhost = preg_replace("/^.*Data Source=(.+?);.*$/", "\\1", $value);
@@ -66,7 +85,7 @@ define('DB_USER', $connectstr_dbusername);
 define('DB_PASSWORD', $connectstr_dbpassword);
 
 /** MySQL hostname */
-define('DB_HOST', $connectstr_dbhost);
+define('DB_HOST', 'p:'.$connectstr_dbhost.':3306');
 
 /** Database Charset to use in creating database tables. */
 define('DB_CHARSET', 'utf8');

@@ -1,0 +1,80 @@
+#Force redirects for site behind CDN/Front door:
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_URI} !(.*)/$
+    RewriteCond %{REQUEST_URI} !^/wp-admin
+    RewriteCond %{REQUEST_URI} !^/wp-json
+    RewriteCond %{HTTP:X-Forwarded-Host} (.+)$
+    RewriteRule ^(.*)$ https://%{HTTP:X-Forwarded-Host}/$1/ [L,R=301,NC]
+</IfModule>
+
+#Canonical redirects:
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:X-Forwarded-Host} !(.+)$
+    RewriteCond %{HTTP_HOST} !^heathmans-wc-base.azureedge.net$ [NC]
+    RewriteCond %{HTTP_HOST} !(-uat|-staging|-qa|-dev) [NC] #exclude slots
+    RewriteRule ^(.*)$ https://heathmans-wc-base.azureedge.net/$1 [L,R=301,NC]
+</IfModule>
+
+# BEGIN WordPress
+# The directives (lines) between "BEGIN WordPress" and "END WordPress" are
+# dynamically generated, and should only be modified via WordPress filters.
+# Any changes to the directives between these markers will be overwritten.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+
+# END WordPress
+
+# BEGIN Expire headers
+AddType application/vnd.ms-fontobject .eot
+AddType font/ttf .ttf
+AddType font/otf .otf
+AddType font/woff .woff
+AddType font/woff2 .woff2
+AddType image/svg+xml .svg
+<IfModule mod_expires.c>
+  # Turn on the module.
+  ExpiresActive on
+  # Set the default expiry times.
+  ExpiresDefault "access plus 2 days"
+  ExpiresByType image/jpg "access plus 1 month"
+  ExpiresByType image/svg+xml "access 1 month"
+  ExpiresByType image/gif "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType text/javascript "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType application/x-shockwave-flash "access plus 1 month"
+  ExpiresByType image/ico "access plus 1 month"
+  ExpiresByType image/x-icon "access plus 1 month"
+  ExpiresByType text/html "access plus 0 seconds"
+  # Add a far future Expires header for fonts
+  ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+  ExpiresByType font/ttf "access plus 1 year"
+  ExpiresByType font/otf "access plus 1 year"
+  ExpiresByType font/woff "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+# END Expire headers
+
+Header unset X-Frame-Options
+Header unset X-Powered-By
+Header unset X-Content-Type-Options
+Header unset Strict-Transport-Security
+Header unset X-Frame-Options
+Header set X-Content-Type-Options "nosniff"
+Header always set X-Xss-Protection "1; mode=block"
+Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+Header always set X-Frame-Options "SAMEORIGIN"
+Header set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:"
+Header edit Set-Cookie ^(.*)$ $1;HttpOnly;Secure;SameSite=strict
