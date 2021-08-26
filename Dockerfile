@@ -28,6 +28,7 @@ RUN set -ex; \
 		libmagickwand-dev \
 		libpng-dev \
 		libzip-dev \
+		libxml2-dev \
 	; \
 		# --------
 		# ~. tools
@@ -53,6 +54,9 @@ RUN set -ex; \
 		mysqli \
 		zip \
 		opcache \
+		soap \
+    pdo \
+    pdo_mysql \
 	; \
 	pecl install imagick-3.4.4; \
 	pecl install redis; \
@@ -109,14 +113,14 @@ RUN { \
 
 RUN set -eux; \
 	a2enmod rewrite expires headers; \
-	echo 'CustomLog /dev/stdout combined' > /etc/apache2/conf-enabled/other-vhosts-access-log.conf; \
+	echo 'CustomLog /dev/null combined' > /etc/apache2/conf-enabled/other-vhosts-access-log.conf; \
   	{ \
 		echo 'ServerSignature Off'; \
 # these IP ranges are reserved for "private" use and should thus *usually* be safe inside Docker
 		echo 'ServerTokens Prod'; \
 		echo 'DocumentRoot /home/site/wwwroot'; \
 		echo 'DirectoryIndex default.htm default.html index.htm index.html index.php hostingstart.html'; \
-		echo 'CustomLog /dev/stdout combined'; \
+		echo 'CustomLog /dev/null combined'; \
 		echo '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">'; \
 		echo '   SetHandler application/x-httpd-php'; \
 		echo '</FilesMatch>'; \

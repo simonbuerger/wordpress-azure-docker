@@ -13,9 +13,9 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{HTTP:X-Forwarded-Host} !(.+)$
-    RewriteCond %{HTTP_HOST} !^heathmans-wc-base.azureedge.net$ [NC]
+    RewriteCond %{HTTP_HOST} !^www.dairygroup.co.za$ [NC]
     RewriteCond %{HTTP_HOST} !(-uat|-staging|-qa|-dev) [NC] #exclude slots
-    RewriteRule ^(.*)$ https://heathmans-wc-base.azureedge.net/$1 [L,R=301,NC]
+    RewriteRule ^(.*)$ https://www.dairygroup.co.za/$1 [L,R=301,NC]
 </IfModule>
 
 # BEGIN WordPress
