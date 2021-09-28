@@ -1,4 +1,4 @@
-FROM php:7.4-apache
+FROM php:8.0-apache
 
 # persistent dependencies
 RUN set -eux; \
@@ -58,7 +58,7 @@ RUN set -ex; \
     pdo \
     pdo_mysql \
 	; \
-	pecl install imagick-3.4.4; \
+	pecl install imagick-3.5.0; \
 	pecl install redis; \
   pecl install mysqlnd_azure; \
 	docker-php-ext-enable imagick; \
