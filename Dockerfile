@@ -12,7 +12,11 @@ RUN set -eux; \
 		curl \
 		logrotate \
 		mariadb-client \
+    supervisor \
     gnupg2 \
+    ocaml \
+    inotify-tools \
+    rsync \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
@@ -29,6 +33,7 @@ RUN set -ex; \
 		libpng-dev \
 		libzip-dev \
 		libxml2-dev \
+    build-essential \
 	; \
 		# --------
 		# ~. tools
@@ -43,6 +48,16 @@ RUN set -ex; \
 		&& rm -rf ./azcopy_linux_amd64_* \
 		&& rm -rf ./downloadazcopy-v10-linux \
 	; \
+		# unison
+  cd /tmp && \
+    wget https://github.com/bcpierce00/unison/archive/v2.52.1.tar.gz && \
+    tar xvf v2.52.1.tar.gz && \
+    cd unison-2.52.1 && \
+    sed -i -e 's/GLIBC_SUPPORT_INOTIFY 0/GLIBC_SUPPORT_INOTIFY 1/' src/fsmonitor/linux/inotify_stubs.c && \
+    make UISTYLE=text NATIVE=true STATIC=true && \
+    cp src/unison src/unison-fsmonitor /usr/local/bin && \
+    rm -rf /tmp/unison-2.52.1 \
+  ; \
 	docker-php-ext-configure gd \
 		--with-freetype \
 		--with-jpeg \
@@ -60,11 +75,9 @@ RUN set -ex; \
 	; \
 	pecl install imagick; \
 	pecl install redis; \
-  pecl install mysqlnd_azure; \
   pecl install apcu; \
 	docker-php-ext-enable imagick; \
 	docker-php-ext-enable redis; \
-	docker-php-ext-enable mysqlnd_azure; \
 	docker-php-ext-enable apcu; \
 	rm -r /tmp/pear; \
 	\
@@ -94,9 +107,11 @@ RUN set -eux; \
 		echo 'opcache.fast_shutdown=1'; \
 	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
 # https://wordpress.org/support/article/editing-wp-config-php/#configure-error-logging
-ENV APACHE_LOG_DIR=/home/LogFiles/apache2
+ENV APACHE_LOG_DIR=/home/LogFiles/sync/apache2
 ENV APACHE_DOCUMENT_ROOT=/home/site/wwwroot
 ENV APACHE_SITE_ROOT=/home/site/
+
+ENV WP_CONTENT_ROOT=/home/site/wwwroot/wp-content
 
 RUN { \
 # https://www.php.net/manual/en/errorfunc.constants.php
@@ -203,9 +218,51 @@ RUN \
   $(php -r "echo(PHP_CONFIG_FILE_SCAN_DIR);")/newrelic.ini
 
 RUN echo "root:Docker!" | chpasswd
-RUN mkdir -p /home/LogFiles/apache2
-RUN mkdir -p "${APACHE_LOG_DIR}"
-
+RUN echo fs.inotify.max_user_watches=500000 | tee -a /etc/sysctl.conf
+RUN mkdir -p /root/.unison
+RUN [ ! -e /root/.unison/default.prf ]; \
+	{ \
+    echo 'root = /home'; \
+    echo 'root = /homelive'; \
+    echo ''; \
+    echo '# Sync options'; \
+    echo 'auto=true'; \
+    echo 'backups=false'; \
+    echo 'batch=true'; \
+    echo 'contactquietly=true'; \
+    echo 'fastcheck=true'; \
+    echo 'maxthreads=10'; \
+    echo 'prefer=newer'; \
+    echo 'silent=true'; \
+    echo 'perms=0'; \
+    echo 'dontchmod=true'; \
+    echo 'owner=false'; \
+    echo ''; \
+    echo 'path=site/wwwroot'; \
+    echo 'path=LogFiles/sync'; \
+    echo ''; \
+    echo '# Files to ignore'; \
+    echo 'ignore = Path site/wwwroot/wp-content/uploads'; \
+    echo 'ignore = Path .git/*'; \
+    echo 'ignore = Path .idea/*'; \
+    echo 'ignore = Name *docker.log'; \
+    echo 'ignore = Name *___jb_tmp___*'; \
+    echo 'ignore = Name {.*,*}.sw[pon]'; \
+    echo ''; \
+    echo '# Additional user configuration'; \
+	} > /root/.unison/default.prf;
+RUN mkdir -p /home/LogFiles/sync
+RUN mkdir -p /home/LogFiles/sync/apache2
+RUN mkdir -p /home/LogFiles/sync/archive
+RUN mkdir -p /homelive/LogFiles/sync
+RUN mkdir -p /homelive/LogFiles/sync/apache2
+RUN mkdir -p /homelive/LogFiles/sync/archive
+RUN touch /homelive/LogFiles/sync/cron.log
+RUN touch /home/LogFiles/supervisor.log
+RUN touch /home/LogFiles/sync-init.log
+RUN touch /home/LogFiles/sync-init-error.log
+RUN touch /home/LogFiles/sync/supervisor.log
+RUN chmod -R 0777 /homelive
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_SITE_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
@@ -216,24 +273,33 @@ RUN chmod -R +x /tmp/ssh_setup.sh \
 	 && (sleep 1;/tmp/ssh_setup.sh 2>&1 > /dev/null) \
 	 && rm -rf /tmp/*
 COPY logrotate.d /etc/logrotate.d
-COPY zmysqlnd_azure.ini /usr/local/etc/php/conf.d/
+# COPY zmysqlnd_azure.ini /usr/local/etc/php/conf.d/
 COPY DigiCertGlobalRootG2.crt.pem /usr/
+COPY DigiCertGlobalRootCA.crt.pem /usr/
 
-RUN (crontab -l -u root; echo "*/1 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/home/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
+# RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/homelive/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
 
-RUN (crontab -l -u root; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
+# RUN (crontab -l -u root; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
 
-RUN echo "cd /home" >> /root/.bashrc
+# RUN echo "cd /homelive" >> /root/.bashrc
 
 ENV WEBSITE_ROLE_INSTANCE_ID localRoleInstance
 ENV WEBSITE_INSTANCE_ID localInstance
 COPY --chown=www-data:www-data wp-config-docker.php /usr/src/wordpress/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY scripts/fix-wordpress-permissions.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/fix-wordpress-permissions.sh
+COPY scripts/sync-init.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/sync-init.sh
 
-WORKDIR /home/site/wwwroot
+# RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; fix-wordpress-permissions.sh /homelive/site/wwwroot > /dev/null") | crontab
+
+ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+WORKDIR /homelive/site/wwwroot
 
 EXPOSE 2222 80
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["apache2-foreground"]
+CMD ["/usr/bin/supervisord"]
