@@ -1,4 +1,4 @@
-FROM php:8.1-apache
+FROM php:8.0-apache
 
 # persistent dependencies
 RUN set -eux; \
@@ -58,12 +58,14 @@ RUN set -ex; \
     pdo \
     pdo_mysql \
 	; \
-	pecl install imagick-3.5.0; \
+	pecl install imagick; \
 	pecl install redis; \
   pecl install mysqlnd_azure; \
+  pecl install apcu; \
 	docker-php-ext-enable imagick; \
 	docker-php-ext-enable redis; \
 	docker-php-ext-enable mysqlnd_azure; \
+	docker-php-ext-enable apcu; \
 	rm -r /tmp/pear; \
 	\
 # reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
@@ -92,6 +94,10 @@ RUN set -eux; \
 		echo 'opcache.fast_shutdown=1'; \
 	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
 # https://wordpress.org/support/article/editing-wp-config-php/#configure-error-logging
+ENV APACHE_LOG_DIR=/home/LogFiles/apache2
+ENV APACHE_DOCUMENT_ROOT=/home/site/wwwroot
+ENV APACHE_SITE_ROOT=/home/site/
+
 RUN { \
 # https://www.php.net/manual/en/errorfunc.constants.php
 # https://github.com/docker-library/wordpress/issues/420#issuecomment-517839670
@@ -104,7 +110,7 @@ RUN { \
 		echo 'display_errors = Off'; \
 		echo 'display_startup_errors = Off'; \
 		echo 'log_errors = On'; \
-		echo 'error_log = /home/logfiles/apache2/php-error.log'; \
+		echo 'error_log = ${APACHE_LOG_DIR}/php-error.log'; \
 		echo 'log_errors_max_len = 1024'; \
 		echo 'ignore_repeated_errors = On'; \
 		echo 'ignore_repeated_source = Off'; \
@@ -118,7 +124,7 @@ RUN set -eux; \
 		echo 'ServerSignature Off'; \
 # these IP ranges are reserved for "private" use and should thus *usually* be safe inside Docker
 		echo 'ServerTokens Prod'; \
-		echo 'DocumentRoot /home/site/wwwroot'; \
+		echo 'DocumentRoot ${APACHE_DOCUMENT_ROOT}'; \
 		echo 'DirectoryIndex default.htm default.html index.htm index.html index.php hostingstart.html'; \
 		echo 'CustomLog /dev/null combined'; \
 		echo '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">'; \
@@ -198,9 +204,8 @@ RUN \
 
 RUN echo "root:Docker!" | chpasswd
 RUN mkdir -p /home/LogFiles/apache2
-ENV APACHE_LOG_DIR=/home/LogFiles/apache2
-ENV APACHE_DOCUMENT_ROOT=/home/site/wwwroot
-ENV APACHE_SITE_ROOT=/home/site/
+RUN mkdir -p "${APACHE_LOG_DIR}"
+
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_SITE_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
@@ -214,7 +219,7 @@ COPY logrotate.d /etc/logrotate.d
 COPY zmysqlnd_azure.ini /usr/local/etc/php/conf.d/
 COPY DigiCertGlobalRootG2.crt.pem /usr/
 
-RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/home/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
+RUN (crontab -l -u root; echo "*/1 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/home/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
 
 RUN (crontab -l -u root; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
 
