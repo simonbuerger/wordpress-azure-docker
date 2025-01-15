@@ -1,5 +1,7 @@
 FROM php:8.0-apache
 
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
 # persistent dependencies
 RUN set -eux; \
 	apt-get update; \
@@ -273,15 +275,8 @@ RUN chmod -R +x /tmp/ssh_setup.sh \
 	 && (sleep 1;/tmp/ssh_setup.sh 2>&1 > /dev/null) \
 	 && rm -rf /tmp/*
 COPY logrotate.d /etc/logrotate.d
-# COPY zmysqlnd_azure.ini /usr/local/etc/php/conf.d/
 COPY DigiCertGlobalRootG2.crt.pem /usr/
 COPY DigiCertGlobalRootCA.crt.pem /usr/
-
-# RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; (/bin/date && /usr/local/bin/wp --path=\"/homelive/site/wwwroot\" --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
-
-# RUN (crontab -l -u root; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
-
-# RUN echo "cd /homelive" >> /root/.bashrc
 
 ENV WEBSITE_ROLE_INSTANCE_ID localRoleInstance
 ENV WEBSITE_INSTANCE_ID localInstance
