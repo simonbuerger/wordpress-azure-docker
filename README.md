@@ -2,7 +2,7 @@
 This Docker image is designed to speed up the execution of PHP applications on Azure that require App Service Storage to be enabled. With App Service Storage enabled, the latency is considerably high. This Docker image eliminates latency by running a sync from the shared  `/home`  folder to a local  `/homelive`  folder when the  `DOCKER_SYNC_ENABLED`  environment variable is set. The sync is unidirectional - on startup it syncs from /home to /homelive (with rsync) and on changes to files in /homelive it syncs back to /home (with unison).
 
 ## Features
-- Based on PHP 8.0
+- Based on PHP 8.3
 - Apache server
 - Pre-installed PHP extensions
 - Optimized for WordPress
