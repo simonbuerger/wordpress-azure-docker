@@ -1,4 +1,19 @@
-FROM php:8.0-apache
+# This Dockerfile sets up a WordPress environment on top of the php:8.3-apache base image.
+#
+# 1. Copies and uses a script to install required PHP extensions, then applies production-oriented PHP settings.
+# 2. Installs essential system packages including Ghostscript, SSH, cron, and MariaDB client, among others.
+# 3. Adds WordPress CLI (wp-cli) and AzCopy for file handling, and compiles Unison for file synchronization.
+# 4. Purges any unnecessary packages to keep the final image lean, then activates OPcache and other important PHP settings.
+# 5. Updates Apache default configuration, enabling modules for rewriting and headers management, and sets up remote IP handling.
+# 6. Installs and configures New Relic for performance monitoring, customizing settings at runtime via environment variables.
+# 7. Adjusts system settings (e.g., inotify watches), initializes SSH through a setup script, and configures log rotation.
+# 8. Prepares directories and paths for WordPress core files, logs, and environment variables required by Azure.
+# 9. Sets up scripts to manage WordPress permissions and file synchronization, using supervisord as the container’s main process.
+# 10. Exposes ports (SSH and HTTP) and utilizes an entrypoint script to initialize final runtime behavior.
+
+FROM php:8.3-apache
+
+COPY --from=ghcr.io/mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
@@ -28,15 +43,6 @@ RUN set -ex; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	\
 	apt-get update; \
-	apt-get install -y --no-install-recommends \
-		libfreetype6-dev \
-		libjpeg-dev \
-		libmagickwand-dev \
-		libpng-dev \
-		libzip-dev \
-		libxml2-dev \
-    build-essential \
-	; \
 		# --------
 		# ~. tools
 		# --------
@@ -60,28 +66,6 @@ RUN set -ex; \
     cp src/unison src/unison-fsmonitor /usr/local/bin && \
     rm -rf /tmp/unison-2.52.1 \
   ; \
-	docker-php-ext-configure gd \
-		--with-freetype \
-		--with-jpeg \
-	; \
-	docker-php-ext-install -j "$(nproc)" \
-		bcmath \
-		exif \
-		gd \
-		mysqli \
-		zip \
-		opcache \
-		soap \
-    pdo \
-    pdo_mysql \
-	; \
-	pecl install imagick; \
-	pecl install redis; \
-  pecl install apcu; \
-	docker-php-ext-enable imagick; \
-	docker-php-ext-enable redis; \
-	docker-php-ext-enable apcu; \
-	rm -r /tmp/pear; \
 	\
 # reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
 	apt-mark auto '.*' > /dev/null; \
@@ -97,10 +81,23 @@ RUN set -ex; \
 	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
 	rm -rf /var/lib/apt/lists/*
 
+RUN set -eux; \
+	install-php-extensions \
+		apcu \
+    bcmath \
+		exif \
+		gd \
+		mysqli \
+		zip \
+		opcache \
+		soap \
+    pdo \
+    pdo_mysql \
+    Imagick/imagick@28f27044e435a2b203e32675e942eb8de620ee58 ;
+
 # set recommended PHP.ini settings
 # see https://secure.php.net/manual/en/opcache.installation.php
 RUN set -eux; \
-	docker-php-ext-enable opcache; \
 	{ \
 		echo 'opcache.memory_consumption=192'; \
 		echo 'opcache.interned_strings_buffer=16'; \
@@ -166,44 +163,6 @@ RUN set -eux; \
 # https://github.com/docker-library/wordpress/issues/383#issuecomment-507886512
 # (replace all instances of "%h" with "%a" in LogFormat)
 	find /etc/apache2 -type f -name '*.conf' -exec sed -ri 's/([[:space:]]*LogFormat[[:space:]]+"[^"]*)%h([^"]*")/\1%a\2/g' '{}' +
-
-RUN set -eux; \
-	version='5.7'; \
-	sha1='76d1332cfcbc5f8b17151b357999d1f758faf897'; \
-	\
-	curl -o wordpress.tar.gz -fL "https://wordpress.org/wordpress-$version.tar.gz"; \
-	echo "$sha1 *wordpress.tar.gz" | sha1sum -c -; \
-	\
-# upstream tarballs include ./wordpress/ so this gives us /usr/src/wordpress
-	tar -xzf wordpress.tar.gz -C /usr/src/; \
-	rm wordpress.tar.gz; \
-	\
-# https://wordpress.org/support/article/htaccess/
-	[ ! -e /usr/src/wordpress/.htaccess ]; \
-	{ \
-		echo '# BEGIN WordPress'; \
-		echo ''; \
-		echo 'RewriteEngine On'; \
-		echo 'RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]'; \
-		echo 'RewriteBase /'; \
-		echo 'RewriteRule ^index\.php$ - [L]'; \
-		echo 'RewriteCond %{REQUEST_FILENAME} !-f'; \
-		echo 'RewriteCond %{REQUEST_FILENAME} !-d'; \
-		echo 'RewriteRule . /index.php [L]'; \
-		echo ''; \
-		echo '# END WordPress'; \
-	} > /usr/src/wordpress/.htaccess; \
-	\
-	chown -R www-data:www-data /usr/src/wordpress; \
-# pre-create wp-content (and single-level children) for folks who want to bind-mount themes, etc so permissions are pre-created properly instead of root:root
-# wp-content/cache: https://github.com/docker-library/wordpress/issues/534#issuecomment-705733507
-	mkdir wp-content; \
-	for dir in /usr/src/wordpress/wp-content/*/ cache; do \
-		dir="$(basename "${dir%/}")"; \
-		mkdir "wp-content/$dir"; \
-	done; \
-	chown -R www-data:www-data wp-content; \
-	chmod -R 777 wp-content
 
 RUN \
   echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list; \

@@ -49,17 +49,6 @@ $domain = $envDomain;
 }
 
 define('DISABLE_WP_CRON', true);
-define('WP_CACHE', true);
-
-// Redis settings
-define('WP_REDIS_SCHEME', 'tls');
-define('WP_REDIS_CLIENT', 'pecl');
-define('WP_REDIS_HOST', getenv('WP_REDIS_HOST'));
-define('WP_REDIS_PORT', '6380');
-define('WP_REDIS_TIMEOUT', 30);
-define('WP_REDIS_DATABASE', 1);
-define('WP_REDIS_PASSWORD', getenv('WP_REDIS_PASSWORD'));
-define('WP_CACHE_KEY_SALT', getenv('WEBSITE_HOSTNAME'));
 
 
 // MySQL config

@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# This script initializes and manages WordPress content synchronization between /home and /homelive.
+# It checks if DOCKER_SYNC_ENABLED is set, then either creates and configures sync tasks or disables them.
+# Key operations:
+# - Prepares folders and symbolic links for wp-content and logs.
+# - Uses rsync to mirror files (excluding specific directories) and apply correct permissions.
+# - Updates Apache configurations to point from /home to /homelive.
+# - Sets up cron jobs for WordPress cron events and Apache log rotation.
+# - Uses unison for one-way or two-way synchronization when DOCKER_SYNC_ENABLED is enabled.
+
 WP_CONTENT_ROOT_LIVE=$(echo $WP_CONTENT_ROOT | sed -e "s/\/home\//\/homelive\//g")
 mkdir -p "$WP_CONTENT_ROOT/uploads"
 mkdir -p "$WP_CONTENT_ROOT_LIVE"
