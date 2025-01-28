@@ -9,15 +9,6 @@
     RewriteRule ^(.*)$ https://%{HTTP:X-Forwarded-Host}/$1/ [L,R=301,NC]
 </IfModule>
 
-#Canonical redirects:
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-    RewriteCond %{HTTP:X-Forwarded-Host} !(.+)$
-    RewriteCond %{HTTP_HOST} !^www.dairygroup.co.za$ [NC]
-    RewriteCond %{HTTP_HOST} !(-uat|-staging|-qa|-dev) [NC] #exclude slots
-    RewriteRule ^(.*)$ https://www.dairygroup.co.za/$1 [L,R=301,NC]
-</IfModule>
-
 # BEGIN WordPress
 # The directives (lines) between "BEGIN WordPress" and "END WordPress" are
 # dynamically generated, and should only be modified via WordPress filters.

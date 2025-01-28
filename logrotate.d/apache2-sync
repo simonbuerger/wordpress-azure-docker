@@ -1,14 +1,11 @@
-/home/logfiles/cron.log
-/home/logfiles/access.log
-/home/logfiles/error.log
-/home/logfiles/apache2/*.log
-
+/homelive/LogFiles/sync/*.log
+/homelive/LogFiles/sync/apache2/*.log
 {
         su www-data www-data
         daily
         missingok
         rotate 14
-        olddir /home/logfiles/archive
+        olddir /homelive/LogFiles/sync/archive
         compress
         notifempty
         create 0640 www-data www-data
