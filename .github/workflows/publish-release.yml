@@ -1,0 +1,45 @@
+name: Publish GitHub Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., v2025.08.21)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          awk "/^#### ${TAG}\$/{flag=1;next}/^#### /{flag=0}flag" CHANGELOG.md > RELEASE_NOTES.md
+          echo "Release notes generated for $TAG:" && cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          make_latest: true
+
