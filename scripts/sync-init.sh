@@ -22,9 +22,33 @@ EOL
 echo "$(date) Sync disabled - init start"
 echo "cd /home" >> /root/.bashrc
 
-(crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /home/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
+if [[ "${USE_SYSTEM_CRON:-1}" == "1" || "${USE_SYSTEM_CRON:-1}" == "true" ]]; then
+  (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /home/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
+fi
 
 (crontab -l; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
+
+# Bootstrap WordPress core in /home if missing
+if [[ ! -f "/home/site/wwwroot/index.php" ]]; then
+    echo "$(date) Bootstrapping WordPress core in /home/site/wwwroot"
+    ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root core download ) || echo "$(date) WP core download skipped/failed"
+fi
+
+# Auto-create wp-config.php if missing using container env (no DB check)
+if [[ ! -f "/home/site/wwwroot/wp-config.php" ]]; then
+    echo "$(date) Creating wp-config.php from docker template"
+    if [[ -f "/usr/src/wordpress/wp-config-docker.php" ]]; then
+        cp /usr/src/wordpress/wp-config-docker.php /home/site/wwwroot/wp-config.php || true
+    else
+        DB_NAME=${DB_DATABASE:-wordpress}
+        DB_USER=${DB_USERNAME:-wordpress}
+        DB_PASS=${DB_PASSWORD:-wordpress}
+        DB_HOST=${DB_HOST:-db}
+        ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" --dbhost="$DB_HOST" --skip-check --force ) || echo "$(date) wp-config creation skipped/failed"
+    fi
+    # Generate unique salts for this installation
+    ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config shuffle-salts ) || echo "$(date) shuffle-salts skipped/failed"
+fi
 
 echo "$(date) Sync disabled - init complete"
 else
@@ -68,6 +92,8 @@ if [[ ! -f "/home/site/wwwroot/wp-config.php" ]]; then
 		DB_HOST=${DB_HOST:-db}
 		( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" --dbhost="$DB_HOST" --skip-check --force ) || echo "$(date) wp-config creation skipped/failed"
 	fi
+    # Generate unique salts for this installation
+    ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config shuffle-salts ) || echo "$(date) shuffle-salts skipped/failed"
 fi
 
 # Ensure target exists
@@ -111,7 +137,9 @@ fi
 
 supervisorctl restart apache2
 
-(crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
+if [[ "${USE_SYSTEM_CRON:-1}" == "1" || "${USE_SYSTEM_CRON:-1}" == "true" ]]; then
+  (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
+fi
 
 (crontab -l; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2-sync > /dev/null") | crontab
 

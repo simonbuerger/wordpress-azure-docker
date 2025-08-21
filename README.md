@@ -1,33 +1,36 @@
-# WordPress-Azure-Docker
-This Docker image is designed to speed up the execution of PHP applications on Azure that require App Service Storage to be enabled. With App Service Storage enabled, the latency is considerably high. This Docker image eliminates latency by running a sync from the shared  `/home`  folder to a local  `/homelive`  folder when the  `DOCKER_SYNC_ENABLED`  environment variable is set. The sync is unidirectional - on startup it syncs from /home to /homelive (with rsync) and on changes to files in /homelive it syncs back to /home (with unison).
+# WordPress on Azure App Service (Docker image)
+Optimized WordPress container for Azure App Service (Linux) with App Service Storage enabled. It mitigates high I/O latency by serving from a fast local path (`/homelive`) and syncing with the persistent path (`/home`).
 
-## Features
-- Based on PHP 8.3
-- Apache server
-- Pre-installed PHP extensions
-- Optimized for WordPress
+## What this is
+- A production-ready WordPress image (PHP 8.3/8.4 + Apache) tuned for Azure App Service.
+- Ships with common PHP extensions, healthcheck, supervisord, and optional WordPress Azure Monitor plugin.
+- Uses rsync + Unison to keep `/homelive` and `/home` in sync when `DOCKER_SYNC_ENABLED=1`.
 
-## Using on app service
-- In order to deploy changes to an app service application with the sync enabled, the application will either need to have the `DOCKER_SYNC_ENABLED`  environment variable turned off and turned back on again. A site restart should also pick up any newly deployed changes
+## Quick start (Azure App Service)
+- Image tag: use an immutable per-build tag for production (e.g., `bluegrassdigital/wordpress-azure-sync:8.3-build-<git-sha>`). Avoid `:latest` and `:stable` in production.
+- App Settings:
+  - `MYSQLCONNSTR_defaultConnection=Data Source=<host>;Database=<db>;User Id=<user>;Password=<pass>`
+  - `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true`
+  - `DOCKER_SYNC_ENABLED=1`
+  - Optional: `USE_SYSTEM_CRON=1` (default) to run WP cron via system cron; set to `0` to use WP internal cron
+  - Optional: `HOST_DOMAIN=<your-domain>`, `WORDPRESS_CONFIG_EXTRA=<php code>`, `WAZM_AUTO_ACTIVATE=1`
+- First boot:
+  - If `/home/site/wwwroot` is empty, the container downloads WordPress and creates `wp-config.php` from the built-in template.
+  - Complete setup by visiting your site URL.
+- .htaccess:
+  - WordPress normally writes this; a hardened template is available at `file-templates/htaccess-template`.
+- Zero-downtime:
+  - Use deployment slots with Health check enabled and swap once warm.
 
-## Development
+### Deploying file changes
+- With `DOCKER_SYNC_ENABLED=1`, the site is served from `/homelive`; changes deployed to `/home/site/wwwroot` (zip deploy/FTP) won’t show until a restart.
+- For file deploys to `/home`, restart the app/slot to pick up changes. Avoid manual rsync while Unison is running.
 
-### Prerequisites
-- [Docker](https://www.docker.com/)
+## Documentation
+- Operations Guide: see `OPERATIONS.md` (deployment, tags, first-time install, plugin, troubleshooting)
+- Development Guide: see `DEV.md` (local dev, example compose). For the dev variant, build the image locally when contributing:
+  - `docker build --target dev --build-arg PHP_VERSION=8.4 -t local/wordpress-azure:8.4-dev .`
+  - Then point your compose file to `local/wordpress-azure:8.4-dev`.
 
-### Building the Docker image
-To build the Docker image, clone the repository and run the following command in the project directory:
-docker build -t <your-image-name> .
-Replace  `<your-image-name>`  with the desired name for the Docker image.
-
-### Running the Docker container
-To run the Docker container, execute the following command:
-docker run -d -p 2222:2222 -p 80:80 --name <container-name> <your-image-name>
-Replace  `<container-name>`  and  `<your-image-name>`  with the desired container name and Docker image name, respectively.
-## Environment variables
-The following environment variables can be set to configure the container:
--  `DOCKER_SYNC_ENABLED`  - Enables Docker Sync when set
--  `APACHE_LOG_DIR`  - Path to Apache access and error logs (default:  `/home/LogFiles/sync/apache2` )
--  `APACHE_DOCUMENT_ROOT`  - Path to the Apache document root (default:  `/home/site/wwwroot` )
--  `APACHE_SITE_ROOT`  - Path to the Apache site root (default:  `/home/site/` )
--  `WP_CONTENT_ROOT`  - Path to the WordPress content root (default:  `/home/site/wwwroot/wp-content` )
+## License
+MIT

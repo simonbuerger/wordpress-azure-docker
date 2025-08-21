@@ -2,15 +2,27 @@ version: "3.8"
 
 services:
   wordpress:
-    image: bluegrassdigital/wordpress-azure-sync:8.4-dev-latest
+    image: local/wordpress-azure:8.4-dev
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        PHP_VERSION: "8.4"
     ports:
       - "8080:80"
     environment:
+      - APP_ENV=development
       - HOST_DOMAIN=localhost:8080
       - MYSQLCONNSTR_defaultConnection=Data Source=db;Database=wordpress;User Id=wordpress;Password=wordpress
+      - XDEBUG_MODE=develop,debug
+      - XDEBUG_CONFIG=client_host=host.docker.internal client_port=9003
       - DOCKER_SYNC_ENABLED=1
+      - WAZM_AUTO_ACTIVATE=1
     volumes:
       - ./src:/home/site/wwwroot
+      - ../wordpress-plugin/wordpress-azure-monitor:/home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor
+      - ../wordpress-plugin/wordpress-azure-monitor:/homelive/site/wwwroot/wp-content/plugins/wordpress-azure-monitor
     depends_on:
       - db
 
@@ -28,3 +40,5 @@ services:
 
 volumes:
   db_data:
+
+

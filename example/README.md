@@ -5,7 +5,7 @@ This example spins up the dev variant of the WordPress image and a MySQL databas
 ## Prerequisites
 - Docker and Docker Compose
 
-## Quick start (using published images)
+## Quick start (simple)
 ```bash
 cd example
 docker compose up -d
@@ -14,6 +14,15 @@ docker compose up -d
 
 - WordPress files map to `example/src` → container `/home/site/wwwroot` for live edits.
 - MySQL data persists in the `db_data` volume.
+- This simple compose uses the dev image with sync enabled and no plugin mounts.
+
+## Contributor/dev compose
+Use `docker-compose.dev.yml` for developing the image and the bundled plugin (mounts + Xdebug). This file builds a local dev image automatically if missing:
+```bash
+cd example
+docker compose -f docker-compose.dev.yml up -d --build
+# Open http://localhost:8080
+```
 
 ## Use a locally built dev image
 Build a local dev image for PHP 8.4 and point Compose at it:
@@ -21,29 +30,30 @@ Build a local dev image for PHP 8.4 and point Compose at it:
 # From repo root
 docker build --target dev --build-arg PHP_VERSION=8.4 -t local/wordpress-azure:8.4-dev .
 
-# In example/docker-compose.yml, set image to local tag
+# In example/docker-compose.yml or example/docker-compose.dev.yml, set image to local tag
 # services.wordpress.image: local/wordpress-azure:8.4-dev
 
 cd example
 docker compose up -d --build
 ```
 
-## Plugin fast dev loop
-The `wordpress-azure-monitor` plugin is live-mounted into the container:
+## Plugin fast dev loop (dev compose)
+With `docker-compose.dev.yml`, the `wordpress-azure-monitor` plugin is live-mounted into the container:
 - Host path: `../wordpress-plugin/wordpress-azure-monitor`
-- Container path: `/home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor`
+- Container paths:
+  - `/home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor`
+  - `/homelive/site/wwwroot/wp-content/plugins/wordpress-azure-monitor`
 
-Activate the plugin:
+Activate the plugin (run once):
 ```bash
 cd example
-# run once
-docker compose exec --user www-data -w /home/site/wwwroot wordpress wp plugin activate wordpress-azure-monitor
+docker compose -f docker-compose.dev.yml exec --user www-data -w /home/site/wwwroot wordpress wp plugin activate wordpress-azure-monitor
 ```
 
-Now edit plugin files on your host, refresh wp-admin to see changes immediately.
+Edit plugin files on your host; refresh wp-admin to see changes immediately.
 
-## Xdebug
-- Default config enables `develop,debug` and starts with each request.
+## Xdebug (dev compose)
+- Default config enables `develop,debug` and starts with each request in the dev compose.
 - For IDEs listening on port 9003, ensure host is `host.docker.internal` (set via `XDEBUG_CONFIG`).
 
 ## Environment

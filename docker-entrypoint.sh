@@ -12,7 +12,6 @@ fi
 cd /homelive/site/wwwroot
 
 # export env to /etc/profile for subshells
-eval $(printenv | sed -n "s/^\([^=]\+\)=\(.*\)
-$/export \1=\2/p" | sed 's/"/\\"/g' | sed '/=/s//="/' | sed 's/$/"/' >> /etc/profile)
+eval $(printenv | sed -n "s/^\([^=]\+\)=\(.*\)$/export \1=\2/p" | sed 's/"/\\\"/g' | sed '/=/s//="/' | sed 's/$/"/' >> /etc/profile)
 
 exec "$@"
