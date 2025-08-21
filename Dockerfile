@@ -172,6 +172,8 @@ COPY DigiCertGlobalRootCA.crt.pem /usr/
 
 # Bundle the monitor plugin (optional auto-activation at runtime)
 COPY wordpress-plugin/wordpress-azure-monitor /opt/wordpress-azure-monitor
+COPY scripts/wp-azure-tools.sh /usr/local/bin/wp-azure-tools
+RUN chmod +x /usr/local/bin/wp-azure-tools
 
 ENV WEBSITE_ROLE_INSTANCE_ID=localRoleInstance
 ENV WEBSITE_INSTANCE_ID=localInstance

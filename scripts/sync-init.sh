@@ -1,5 +1,21 @@
 #!/usr/bin/env bash
 
+# Per-run logging: capture the entire run to unique files under /home/LogFiles/sync
+RUN_TS=$(date +%Y%m%d-%H%M%S)
+LOG_BASE_DIR=/home/LogFiles/sync
+RUNS_DIR="$LOG_BASE_DIR/runs"
+mkdir -p "$RUNS_DIR"
+RUN_LOG="$RUNS_DIR/sync-init-$RUN_TS.log"
+ERR_LOG="$RUNS_DIR/sync-init-error-$RUN_TS.log"
+# Redirect all stdout/stderr to the per-run logs (and echo to console for supervisor)
+exec > >(tee -a "$RUN_LOG") 2> >(tee -a "$ERR_LOG" >&2)
+# Update convenient symlinks to the current run
+ln -sfn "$RUN_LOG" "$LOG_BASE_DIR/sync-init.current.log"
+ln -sfn "$ERR_LOG" "$LOG_BASE_DIR/sync-init-error.current.log"
+# Back-compat symlinks for existing consumers (plugin/configs)
+ln -sfn "$LOG_BASE_DIR/sync-init.current.log" /home/LogFiles/sync-init.log
+ln -sfn "$LOG_BASE_DIR/sync-init-error.current.log" /home/LogFiles/sync-init-error.log
+
 # This script bootstraps and synchronizes WordPress between persistent storage (/home)
 # and the live working tree (/homelive).
 #

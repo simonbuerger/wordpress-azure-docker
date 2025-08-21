@@ -1,4 +1,19 @@
 /home/LogFiles/*.log
+{
+        su www-data www-data
+        daily
+        missingok
+        rotate 14
+        olddir /home/LogFiles/sync/archive
+        compress
+        notifempty
+        create 0640 www-data www-data
+        dateext
+        dateformat .%Y-%m-%d
+        sharedscripts
+        copytruncate
+}
+
 /home/LogFiles/sync/*.log
 /home/LogFiles/sync/apache2/*.log
 {
