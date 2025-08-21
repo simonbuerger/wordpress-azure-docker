@@ -36,6 +36,7 @@ This document tracks the improvements and release steps for `bluegrassdigital/wo
 - [ ] Add `CHANGELOG.md`, confirm `LICENSE` contents, and add `CODEOWNERS`
 - [ ] Define release process: cut git tag → publish `stable` + full PHP version tags
  - [x] Define release process: cut git tag → publish `stable` + full PHP version tags
+ - [ ] Enhance release workflow: attach Trivy reports and link Docker image tags (`:8.x-stable`, `:<full-php-version>`, digests) in GitHub Release body
 
 ### Later (enhancements)
 - [ ] Add PHP 8.5 targets when GA
