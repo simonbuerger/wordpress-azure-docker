@@ -2,6 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
+    branches: ["main", "master"]
     tags: ["v*"]
   workflow_dispatch:
   schedule:
@@ -105,3 +106,23 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then \
             docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-build-${{ github.sha }}; \
           fi
+
+      - name: Trivy scan (prod image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          exit-code: '0'
+
+      - name: Trivy scan (dev image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          exit-code: '0'

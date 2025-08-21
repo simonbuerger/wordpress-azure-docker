@@ -4,6 +4,7 @@
  * Description: Shows Azure sync status in the admin bar and provides a logs dashboard for /home/LogFiles/sync.
  * Version: 0.1.5
  * Author: Blugrass Digital
+ * Update URI: https://bluegrass.digital/wordpress-azure-monitor
  * Security: Enhanced with comprehensive input validation and output sanitization
  * Performance: Optimized with efficient log tailing and intelligent caching
  */

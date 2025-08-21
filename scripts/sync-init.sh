@@ -118,7 +118,8 @@ echo "$(date) Sync disabled - init complete"
 # Ensure bundled plugin exists and optionally auto-activate (sync disabled path)
 if [[ -d "/opt/wordpress-azure-monitor" ]]; then
     mkdir -p /home/site/wwwroot/wp-content/plugins
-    rsync -a /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ || true
+    # Mirror plugin from image into persisted path (overwrite removed files too)
+    rsync -a --delete --chown "www-data:www-data" /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ || true
 fi
 if [[ -n "${WAZM_AUTO_ACTIVATE}" && "${WAZM_AUTO_ACTIVATE}" == "1" ]]; then
     WP_CLI_ALLOW_ROOT=1 sh -lc "cd '/home/site/wwwroot' && wp core is-installed --quiet && wp plugin activate wordpress-azure-monitor --quiet" || true
@@ -248,12 +249,12 @@ fi
 if [[ -d "/opt/wordpress-azure-monitor" ]]; then
     mkdir -p /home/site/wwwroot/wp-content/plugins /homelive/site/wwwroot/wp-content/plugins
     log_info "Copying bundled wordpress-azure-monitor plugin to persistent and live paths"
-    if rsync -a /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/; then
+    if rsync -a --delete --chown "www-data:www-data" /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/; then
       log_info "Plugin copied to /home path"
     else
       log_warn "Plugin copy to /home failed (continuing)"
     fi
-    if rsync -a /opt/wordpress-azure-monitor/ /homelive/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/; then
+    if rsync -a --delete --chown "www-data:www-data" /opt/wordpress-azure-monitor/ /homelive/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/; then
       log_info "Plugin copied to /homelive path"
     else
       log_warn "Plugin copy to /homelive failed (continuing)"

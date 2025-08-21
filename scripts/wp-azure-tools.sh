@@ -83,10 +83,10 @@ cmd_plugin_reinstall() {
 		return 1
 	fi
 	derive_live_paths
-	log_info "Copying wordpress-azure-monitor to persistent and live paths"
+	log_info "Mirroring wordpress-azure-monitor from image to persistent and live paths"
 	mkdir -p /home/site/wwwroot/wp-content/plugins "${WP_CONTENT_ROOT_LIVE%/}/plugins"
-	rsync -a /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ && log_info "Plugin copied to /home" || log_warn "Copy to /home failed"
-	rsync -a /opt/wordpress-azure-monitor/ "${WP_CONTENT_ROOT_LIVE%/}/plugins/wordpress-azure-monitor/" && log_info "Plugin copied to /homelive" || log_warn "Copy to /homelive failed"
+	rsync -a --delete --chown "www-data:www-data" /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ && log_info "Plugin mirrored to /home" || log_warn "Mirror to /home failed"
+	rsync -a --delete --chown "www-data:www-data" /opt/wordpress-azure-monitor/ "${WP_CONTENT_ROOT_LIVE%/}/plugins/wordpress-azure-monitor/" && log_info "Plugin mirrored to /homelive" || log_warn "Mirror to /homelive failed"
 	if [[ "$activate_flag" == "-a" || "$activate_flag" == "--activate" ]]; then
 		log_info "Attempting activation if WP core is installed"
 		WP_CLI_ALLOW_ROOT=1 sh -lc "cd '/homelive/site/wwwroot' && wp core is-installed --quiet && wp plugin activate wordpress-azure-monitor --quiet" && log_info "Activated on /homelive" || log_warn "Activation on /homelive skipped/failed"

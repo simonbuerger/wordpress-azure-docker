@@ -15,24 +15,24 @@ This document tracks the improvements and release steps for `bluegrassdigital/wo
   - [x] `org.opencontainers.image.vendor` → `Bluegrass Digital`
 - [x] Add/verify `.dockerignore` to shrink build context (keep `.github/` included)
   - [x] Exclude `example/src/**`, `**/.git`, `**/.DS_Store`, `**/node_modules`, `**/.cache`, `**/vendor/*`
-- [ ] Tagging policy in CI
+- [x] Tagging policy in CI
   - [x] Push `:8.3-latest`, `:8.4-latest` on every merge to `main`/`master`
   - [x] Only push `:8.x-stable` and full PHP version tags when `github.ref_type == tag`
-  - [ ] Add workflow trigger for tag pushes (e.g. `on: push: tags: ['v*']`)
+  - [x] Add workflow trigger for tag pushes (e.g. `on: push: tags: ['v*']`)
 - [x] Example Docker Compose
   - [x] Default to Hub image with commented instructions to build local dev image
   - [x] Remove auto-install; keep optional auto-activate
   - [x] Add snippet for manual `wp core install` (in `DEV.md`)
-- [ ] Documentation split
+- [x] Documentation split
   - [x] Add `DEV.md` (local dev, WP-CLI, xdebug, file paths `/home` vs `/homelive`)
   - [x] Add `OPERATIONS.md` (Azure env vars, logs, New Relic, CI tags, upgrade policy)
-  - [ ] Update root `README.md` to link to both
+  - [x] Update root `README.md` to link to both
 
 ### Next (hardening and automation)
-- [ ] CI security scan with Trivy after pushing images
-- [ ] Weekly scheduled rebuild workflow (to pick up base image CVEs)
+- [x] CI security scan with Trivy after pushing images
+- [x] Weekly scheduled rebuild workflow (to pick up base image CVEs)
 - [ ] Smoke tests in CI: run container, `curl http://localhost`, `php -v`, `wp --version`
-- [ ] Dependabot/Renovate for GitHub Actions and base images
+- [x] Dependabot/Renovate for GitHub Actions and base images
 - [ ] Add `CHANGELOG.md`, confirm `LICENSE` contents, and add `CODEOWNERS`
 - [ ] Define release process: cut git tag → publish `stable` + full PHP version tags
 
