@@ -14,6 +14,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -44,7 +45,7 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: ${{ github.ref_type == 'tag' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.php_version }}
@@ -53,7 +54,7 @@ jobs:
           provenance: false
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-latest
-            ${{ github.ref_type == 'tag' && format('{0}:{1}-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
+            ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
 
       - name: Build and push (dev, multi-arch)
@@ -63,7 +64,7 @@ jobs:
           context: .
           file: Dockerfile
           target: dev
-          platforms: ${{ github.ref_type == 'tag' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.php_version }}
@@ -72,7 +73,7 @@ jobs:
           provenance: false
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-latest
-            ${{ github.ref_type == 'tag' && format('{0}:{1}-dev-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
+            ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-dev-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
 
       - name: Resolve full PHP version from prod image
@@ -107,7 +108,7 @@ jobs:
             docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-build-${{ github.sha }}; \
           fi
 
-      - name: Trivy scan (prod image)
+      - name: Trivy scan (prod image - table)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
@@ -115,9 +116,15 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          output: trivy-prod.txt
           exit-code: '0'
 
-      - name: Trivy scan (dev image)
+      - name: Trivy Summary (prod)
+        run: |
+          echo "### Trivy scan (prod) for PHP ${{ matrix.php_version }}" >> $GITHUB_STEP_SUMMARY
+          cat trivy-prod.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: Trivy scan (dev image - table)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
@@ -125,4 +132,46 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
           format: 'table'
+          output: trivy-dev.txt
           exit-code: '0'
+
+      - name: Trivy Summary (dev)
+        run: |
+          echo "### Trivy scan (dev) for PHP ${{ matrix.php_version }}" >> $GITHUB_STEP_SUMMARY
+          cat trivy-dev.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: Trivy SARIF (prod image)
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: trivy-prod.sarif
+          exit-code: '0'
+
+      - name: Upload SARIF (prod)
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-prod.sarif
+
+      - name: Trivy SARIF (dev image)
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: trivy-dev.sarif
+          exit-code: '0'
+
+      - name: Upload SARIF (dev)
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-dev.sarif

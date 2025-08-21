@@ -31,6 +31,7 @@ Optimized WordPress container for Azure App Service (Linux) with App Service Sto
 - Development Guide: see `DEV.md` (local dev, example compose). For the dev variant, build the image locally when contributing:
   - `docker build --target dev --build-arg PHP_VERSION=8.4 -t local/wordpress-azure:8.4-dev .`
   - Then point your compose file to `local/wordpress-azure:8.4-dev`.
+ - Release Process: see `RELEASING.md` (tags, changelogs, weekly vs feature releases)
 
 ## License
 MIT

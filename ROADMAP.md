@@ -35,6 +35,7 @@ This document tracks the improvements and release steps for `bluegrassdigital/wo
 - [x] Dependabot/Renovate for GitHub Actions and base images
 - [ ] Add `CHANGELOG.md`, confirm `LICENSE` contents, and add `CODEOWNERS`
 - [ ] Define release process: cut git tag → publish `stable` + full PHP version tags
+ - [x] Define release process: cut git tag → publish `stable` + full PHP version tags
 
 ### Later (enhancements)
 - [ ] Add PHP 8.5 targets when GA

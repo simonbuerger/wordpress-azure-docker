@@ -75,3 +75,7 @@ Practical flow
 - Imagick pinned to 3.8.0 for PHP 8.4+ compatibility.
 
 
+#### Release process
+- See `RELEASING.md` for tag semantics, weekly vs feature releases, and changelog workflow.
+
+
