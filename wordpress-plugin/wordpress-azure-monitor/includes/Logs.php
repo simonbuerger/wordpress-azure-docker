@@ -24,28 +24,41 @@ class WAZM_Logs
             return $cached;
         }
 
-        $map = [
-            'apache-access' => [
-                'label' => 'Apache Access',
-                'path'  => '/home/LogFiles/sync/apache2/access.log',
-            ],
-            'apache-error' => [
-                'label' => 'Apache Error',
-                'path'  => '/home/LogFiles/sync/apache2/error.log',
-            ],
-            'cron' => [
-                'label' => 'Cron',
-                'path'  => '/home/LogFiles/sync/cron.log',
-            ],
-            'sync' => [
-                'label' => 'Sync',
-                'path'  => '/home/LogFiles/sync/supervisor.log',
-            ],
-            'sync-init' => [
-                'label' => 'Sync Init',
-                'path'  => '/home/LogFiles/sync-init.log',
-            ],
+        // Prefer homelive paths (sync-enabled) and fall back to home variants
+        $candidates = [
+            'apache-access' => ['/homelive/LogFiles/sync/apache2/access.log', '/home/LogFiles/sync/apache2/access.log'],
+            'apache-error'  => ['/homelive/LogFiles/sync/apache2/error.log',  '/home/LogFiles/sync/apache2/error.log'],
+            'php-error'     => ['/homelive/LogFiles/sync/apache2/php-error.log','/home/LogFiles/sync/apache2/php-error.log'],
+            'cron'          => ['/home/LogFiles/sync/cron.log', '/home/LogFiles/cron.log', '/homelive/LogFiles/sync/cron.log'],
+            'sync'          => ['/home/LogFiles/sync/supervisor.log'],
+            'supervisord'   => ['/home/LogFiles/supervisord.log'],
+            'sync-init'     => ['/home/LogFiles/sync-init.log'],
+            'sync-init-error' => ['/home/LogFiles/sync-init-error.log'],
         ];
+
+        $labels = [
+            'apache-access' => 'Apache Access',
+            'apache-error' => 'Apache Error',
+            'php-error' => 'PHP Error',
+            'cron' => 'Cron',
+            'sync' => 'Sync',
+            'supervisord' => 'Supervisord',
+            'sync-init' => 'Sync Init',
+            'sync-init-error' => 'Sync Init (stderr)',
+        ];
+
+        $map = [];
+        foreach ($candidates as $key => $paths) {
+            foreach ($paths as $p) {
+                if (is_file($p) && is_readable($p)) {
+                    $map[$key] = [
+                        'label' => $labels[$key],
+                        'path' => $p,
+                    ];
+                    break; // prefer the first existing candidate
+                }
+            }
+        }
 
         // Only include files that exist and are readable
         foreach ($map as $key => $meta) {

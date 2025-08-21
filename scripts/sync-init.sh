@@ -27,7 +27,7 @@ echo "$(date) Sync disabled - init start"
 echo "cd /home" >> /root/.bashrc
 
 if [[ "${USE_SYSTEM_CRON:-1}" == "1" || "${USE_SYSTEM_CRON:-1}" == "true" ]]; then
-  (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /home/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/cron.log  2>&1") | crontab
+  (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /home/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/sync/cron.log  2>&1") | crontab
 fi
 
 (crontab -l; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
@@ -162,10 +162,10 @@ if [[ -d "/opt/wordpress-azure-monitor" ]]; then
 fi
 
 if [[ "${USE_SYSTEM_CRON:-1}" == "1" || "${USE_SYSTEM_CRON:-1}" == "true" ]]; then
-  (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
+  (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/sync/cron.log  2>&1") | crontab
 fi
 
-(crontab -l; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2-sync > /dev/null") | crontab
+(crontab -l; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
 
 supervisorctl start sync
 

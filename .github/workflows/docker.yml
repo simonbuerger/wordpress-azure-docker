@@ -2,15 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: ["main", "master"]
-    paths:
-      - "Dockerfile"
-      - "docker-bake.hcl"
-      - "file-templates/**"
-      - "scripts/**"
-      - "supervisord.conf"
-      - "docker-entrypoint.sh"
-  # Promote stable/full-version tags only on git tags
+    tags: ["v*"]
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * 1"   # Weekly rebuild to pick up PHP/OS patches
