@@ -194,8 +194,8 @@ else
   echo "$(date) Seed wp-content FAILED (non-fatal)"
 fi
 
-echo "$(date) Seeding logs: /home/LogFiles -> /homelive/LogFiles"
-if rsync -apoghW --no-compress /home/LogFiles/ /homelive/LogFiles/ --exclude '*.unison.tmp'; then
+echo "$(date) Seeding logs: /home/LogFiles -> /homelive/LogFiles (excluding sync/runs)"
+if rsync -apoghW --no-compress /home/LogFiles/ /homelive/LogFiles/ --exclude '*.unison.tmp' --exclude 'sync/runs/**'; then
   echo "$(date) Seeded logs OK"
 else
   echo "$(date) Seed logs FAILED (non-fatal)"
@@ -238,7 +238,7 @@ else
 	unison default -force /homelive
 fi
 
-if supervisorctl restart apache2; then
+if supervisorctl -s unix:///var/run/supervisor.sock -u supervisor -p localonly restart apache2; then
   log_info "Apache restarted via supervisor"
 else
   log_warn "Apache restart via supervisor failed (continuing)"
@@ -268,7 +268,7 @@ fi
 (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
 log_info "Installed daily logrotate cron for /etc/logrotate.d/apache2"
 
-if supervisorctl start sync; then
+if supervisorctl -s unix:///var/run/supervisor.sock -u supervisor -p localonly start sync; then
   log_info "Started unison sync process"
 else
   log_warn "Failed to start unison sync process (continuing)"

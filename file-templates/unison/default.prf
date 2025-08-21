@@ -22,6 +22,7 @@ ignore = Path site/wwwroot/wp-content/uploads
 ignore = Path .git/*
 ignore = Path .idea/*
 ignore = Name *docker.log
+ignore = Path LogFiles/sync/runs
 ignore = Name *___jb_tmp___*
 ignore = Name {.*,*}.sw[pon]
 

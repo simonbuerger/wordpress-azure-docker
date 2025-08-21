@@ -15,6 +15,8 @@
 #   run-cron [home|homelive]     Run WP cron due-now in selected tree (defaults based on DOCKER_SYNC_ENABLED)
 #   seed-logs                    Rotate then seed logs from /home to /homelive
 #   seed-content                 Seed code and wp-content (excl. uploads) from /home to /homelive
+#   bootstrap-core [-f]          Download/refresh WP core into /home/site/wwwroot (-f to force)
+#   bootstrap-config [-f]        Recreate wp-config.php from docker template (-f to overwrite)
 #
 # Notes:
 # - Safe by default; commands log their actions and continue on minor failures.
@@ -151,6 +153,51 @@ cmd_seed_content() {
 	rsync -apoghW --no-compress "${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content}/" "$WP_CONTENT_ROOT_LIVE/" --exclude 'uploads' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0775,F0664" && log_info "wp-content seeded" || log_warn "wp-content seeding failed"
 }
 
+cmd_bootstrap_core() {
+    local force="$1"
+    local target="/home/site/wwwroot"
+    mkdir -p "$target"
+    if [[ -f "$target/index.php" && "$force" != "-f" && "$force" != "--force" ]]; then
+        log_info "Core already present at $target (use -f to force re-download)"
+        return 0
+    fi
+    log_info "Downloading WordPress core to $target"
+    if ( cd "$target" && /usr/local/bin/wp --allow-root core download --force ); then
+        log_info "WordPress core downloaded"
+    else
+        log_warn "WordPress core download failed"
+    fi
+}
+
+cmd_bootstrap_config() {
+    local force="$1"
+    local target="/home/site/wwwroot/wp-config.php"
+    if [[ -f "$target" && "$force" != "-f" && "$force" != "--force" ]]; then
+        log_info "wp-config.php already exists (use -f to overwrite)"
+        return 0
+    fi
+    if [[ -f "/usr/src/wordpress/wp-config-docker.php" ]]; then
+        log_info "Copying docker wp-config template to $target"
+        if cp /usr/src/wordpress/wp-config-docker.php "$target"; then
+            log_info "wp-config.php written"
+        else
+            log_warn "Failed to write wp-config.php"
+        fi
+    else
+        log_info "Template missing; generating via wp-cli (skip DB check)"
+        local DB_NAME=${DB_DATABASE:-wordpress}
+        local DB_USER=${DB_USERNAME:-wordpress}
+        local DB_PASS=${DB_PASSWORD:-wordpress}
+        local DB_HOST=${DB_HOST:-db}
+        if ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" --dbhost="$DB_HOST" --skip-check --force ); then
+            log_info "wp-config.php generated"
+            ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config shuffle-salts ) && log_info "Salts shuffled" || log_warn "Salt shuffle failed"
+        else
+            log_warn "wp-config generation failed"
+        fi
+    fi
+}
+
 usage() {
 	cat <<EOF
 Usage: wp-azure-tools <command> [options]
@@ -164,6 +211,8 @@ Commands:
   run-cron [home|homelive]     Run WP cron due-now in selected tree
   seed-logs                    Rotate then seed logs from /home to /homelive
   seed-content                 Seed code and wp-content (excl. uploads) to /homelive
+  bootstrap-core [-f]          Download/refresh WP core into /home/site/wwwroot (-f to force)
+  bootstrap-config [-f]        Recreate wp-config.php from docker template (-f to overwrite)
 
 Examples:
   wp-azure-tools plugin-reinstall -a
@@ -182,6 +231,8 @@ main() {
 		run-cron) shift; cmd_run_cron "${1:-}" ;;
 		seed-logs) shift; cmd_seed_logs ;;
 		seed-content) shift; cmd_seed_content ;;
+		bootstrap-core) shift; cmd_bootstrap_core "${1:-}" ;;
+		bootstrap-config) shift; cmd_bootstrap_config "${1:-}" ;;
 		-h|--help|help|"") usage ;;
 		*) log_error "Unknown command: $1"; usage; return 1 ;;
 	 esac
