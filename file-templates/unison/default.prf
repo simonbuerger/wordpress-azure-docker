@@ -1,0 +1,28 @@
+root = /home
+root = /homelive
+
+# Sync options
+auto=true
+backups=false
+batch=true
+contactquietly=true
+fastcheck=true
+maxthreads=10
+prefer=newer
+silent=true
+perms=0
+dontchmod=true
+owner=false
+
+path=site/wwwroot
+path=LogFiles/sync
+
+# Files to ignore
+ignore = Path site/wwwroot/wp-content/uploads
+ignore = Path .git/*
+ignore = Path .idea/*
+ignore = Name *docker.log
+ignore = Name *___jb_tmp___*
+ignore = Name {.*,*}.sw[pon]
+
+# Additional user configuration

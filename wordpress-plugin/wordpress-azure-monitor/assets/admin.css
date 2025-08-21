@@ -1,0 +1,87 @@
+/* WordPress Azure Monitor Plugin Styles */
+
+/* Status Badge Base Styles */
+.wazm-badge {
+    display: inline-block;
+    padding: 3px 10px !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    color: #fff !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+    min-width: 60px !important;
+}
+
+/* Status Badge Colors */
+.wazm-badge--green {
+    background: #2e7d32;
+}
+
+.wazm-badge--yellow {
+    background: #f9a825;
+}
+
+.wazm-badge--red {
+    background: #c62828;
+}
+
+.wazm-badge--blue {
+    background: #1565c0;
+}
+
+/* Log Display Styles */
+.wazm-log {
+    background: #0b0b0b;
+    color: #dfe6e9;
+    padding: 12px;
+    white-space: pre-wrap;
+    max-height: 60vh;
+    overflow: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Form Styles */
+#wazm-log-select {
+    min-width: 200px;
+    margin-right: 8px;
+}
+
+/* Status Display */
+.wazm-status-display {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border-left: 4px solid #0073aa;
+    border-radius: 4px;
+}
+
+/* Error Notices */
+.wazm-error-notice {
+    background: #fef7f1;
+    border-left: 4px solid #d63638;
+    padding: 12px;
+    margin: 15px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 782px) {
+    .wazm-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        min-width: 50px;
+    }
+
+    #wazm-log-select {
+        min-width: 150px;
+    }
+
+    .wazm-log {
+        font-size: 11px;
+        padding: 8px;
+    }
+}

@@ -1,17 +1,40 @@
 # This Dockerfile sets up a WordPress environment on top of the php:8.3-apache base image.
 #
-# 1. Copies and uses a script to install required PHP extensions, then applies production-oriented PHP settings.
-# 2. Installs essential system packages including Ghostscript, SSH, cron, and MariaDB client, among others.
-# 3. Adds WordPress CLI (wp-cli) and AzCopy for file handling, and compiles Unison for file synchronization.
-# 4. Purges any unnecessary packages to keep the final image lean, then activates OPcache and other important PHP settings.
-# 5. Updates Apache default configuration, enabling modules for rewriting and headers management, and sets up remote IP handling.
-# 6. Installs and configures New Relic for performance monitoring, customizing settings at runtime via environment variables.
-# 7. Adjusts system settings (e.g., inotify watches), initializes SSH through a setup script, and configures log rotation.
-# 8. Prepares directories and paths for WordPress core files, logs, and environment variables required by Azure.
-# 9. Sets up scripts to manage WordPress permissions and file synchronization, using supervisord as the container’s main process.
-# 10. Exposes ports (SSH and HTTP) and utilizes an entrypoint script to initialize final runtime behavior.
+# 1. Installs essential system packages including Ghostscript, SSH, cron, MariaDB client, rsync, inotify, and supervisord.
+# 2. Adds WordPress CLI (wp-cli), AzCopy for file handling, and Unison for file synchronization (multi-stage to keep final image lean).
+# 3. Installs required PHP extensions and applies production-oriented PHP and Apache settings.
+# 4. Configures Apache modules (rewrite, headers, remoteip) and log behavior; adjusts for Azure environment paths.
+# 5. Attempts New Relic agent setup (best-effort) and configures at runtime via environment variables.
+# 6. Prepares directories and files for WordPress core, logs, and scripts; uses supervisord as the main process.
+# 7. Exposes SSH and HTTP ports and runs an entrypoint to initialize runtime behavior.
 
-FROM php:8.3-apache
+ARG PHP_VERSION=8.3
+
+# --- Build stage for Unison (kept out of the final image) ---
+FROM debian:bookworm-slim AS unison-builder
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		unison \
+		ca-certificates; \
+	rm -rf /var/lib/apt/lists/*; \
+	install -Dm755 /usr/bin/unison /out/unison; \
+	if [ -x /usr/bin/unison-fsmonitor ]; then install -Dm755 /usr/bin/unison-fsmonitor /out/unison-fsmonitor; else echo 'echo "unison-fsmonitor not available; unison will still function"' > /out/unison-fsmonitor && chmod +x /out/unison-fsmonitor; fi
+
+# --- Final runtime image ---
+FROM php:${PHP_VERSION}-apache AS runtime
+
+ARG OCI_TITLE="wordpress-azure"
+ARG OCI_DESCRIPTION="WordPress on php-apache with Azure-specific tooling (AzCopy), Unison sync, New Relic, SSH, and supervisord"
+ARG OCI_SOURCE="https://hub.docker.com/r/bluegrassdigital/wordpress-azure-sync"
+ARG OCI_VENDOR="Bluegrass Digital"
+ARG OCI_LICENSES="MIT"
+
+LABEL org.opencontainers.image.title="$OCI_TITLE" \
+	org.opencontainers.image.description="$OCI_DESCRIPTION" \
+	org.opencontainers.image.source="$OCI_SOURCE" \
+	org.opencontainers.image.vendor="$OCI_VENDOR" \
+	org.opencontainers.image.licenses="$OCI_LICENSES"
 
 COPY --from=ghcr.io/mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
@@ -21,7 +44,7 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
-# Ghostscript is required for rendering PDF previews
+		# Ghostscript is required for rendering PDF previews
 		ghostscript \
 		openssh-server \
 		wget \
@@ -29,58 +52,36 @@ RUN set -eux; \
 		curl \
 		logrotate \
 		mariadb-client \
-    supervisor \
-    gnupg2 \
-    ocaml \
-    inotify-tools \
-    rsync \
-	; \
+		supervisor \
+		gnupg \
+		inotify-tools \
+		rsync \
+		ca-certificates; \
 	rm -rf /var/lib/apt/lists/*
 
-# install the PHP extensions we need (https://make.wordpress.org/hosting/handbook/handbook/server-environment/#php-extensions)
-RUN set -ex; \
-	\
-	savedAptMark="$(apt-mark showmanual)"; \
-	\
-	apt-get update; \
-		# --------
-		# ~. tools
-		# --------
-		# wp-cli
-	curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-		&& chmod +x wp-cli.phar \
-		&& mv wp-cli.phar /usr/local/bin/wp \
-		&& wget https://aka.ms/downloadazcopy-v10-linux \
-		&& tar -xvf downloadazcopy-v10-linux \
-		&& cp ./azcopy_linux_amd64_*/azcopy /usr/bin/ \
-		&& rm -rf ./azcopy_linux_amd64_* \
-		&& rm -rf ./downloadazcopy-v10-linux \
-	; \
-		# unison
-  cd /tmp && \
-    wget https://github.com/bcpierce00/unison/archive/v2.52.1.tar.gz && \
-    tar xvf v2.52.1.tar.gz && \
-    cd unison-2.52.1 && \
-    sed -i -e 's/GLIBC_SUPPORT_INOTIFY 0/GLIBC_SUPPORT_INOTIFY 1/' src/fsmonitor/linux/inotify_stubs.c && \
-    make UISTYLE=text NATIVE=true STATIC=true && \
-    cp src/unison src/unison-fsmonitor /usr/local/bin && \
-    rm -rf /tmp/unison-2.52.1 \
-  ; \
-	\
-# reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
-	apt-mark auto '.*' > /dev/null; \
-	apt-mark manual $savedAptMark; \
-	ldd "$(php -r 'echo ini_get("extension_dir");')"/*.so \
-		| awk '/=>/ { print $3 }' \
-		| sort -u \
-		| xargs -r dpkg-query -S \
-		| cut -d: -f1 \
-		| sort -u \
-		| xargs -rt apt-mark manual; \
-	\
-	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
-	rm -rf /var/lib/apt/lists/*
+# tools: wp-cli and AzCopy
+RUN set -eux; \
+	# wp-cli
+	curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp; \
+	chmod +x /usr/local/bin/wp; \
+	# AzCopy (arch-aware)
+	arch=$(dpkg --print-architecture); \
+	case "$arch" in \
+	  amd64) AZCOPY_URL="https://aka.ms/downloadazcopy-v10-linux"; PATTERN="azcopy_linux_amd64_*" ;; \
+	  arm64) AZCOPY_URL="https://aka.ms/downloadazcopy-v10-linux-arm64"; PATTERN="azcopy_linux_arm64_*" ;; \
+	  *) AZCOPY_URL="https://aka.ms/downloadazcopy-v10-linux"; PATTERN="azcopy_linux_amd64_*" ;; \
+	esac; \
+	curl -fsSL "$AZCOPY_URL" -o azcopy.tgz; \
+	tar -xvf azcopy.tgz; \
+	cp ./${PATTERN}/azcopy /usr/bin/; \
+	rm -rf ./${PATTERN} ./azcopy.tgz
 
+# Unison binaries from the builder stage
+COPY --from=unison-builder /out/unison /usr/local/bin/unison
+COPY --from=unison-builder /out/unison-fsmonitor /usr/local/bin/unison-fsmonitor
+
+# PHP extensions
+ARG IMAGICK_PACKAGE=imagick-3.8.0
 RUN set -eux; \
 	install-php-extensions \
 		apcu \
@@ -93,139 +94,71 @@ RUN set -eux; \
 		soap \
     pdo \
     pdo_mysql \
-    Imagick/imagick@28f27044e435a2b203e32675e942eb8de620ee58 ;
+    ${IMAGICK_PACKAGE} ;
 
-# set recommended PHP.ini settings
-# see https://secure.php.net/manual/en/opcache.installation.php
-RUN set -eux; \
-	{ \
-		echo 'opcache.memory_consumption=192'; \
-		echo 'opcache.interned_strings_buffer=16'; \
-		echo 'opcache.max_accelerated_files=8000'; \
-		echo 'opcache.revalidate_freq=30'; \
-		echo 'opcache.fast_shutdown=1'; \
-	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
-# https://wordpress.org/support/article/editing-wp-config-php/#configure-error-logging
+# Apache and PHP config via templates
 ENV APACHE_LOG_DIR=/home/LogFiles/sync/apache2
 ENV APACHE_DOCUMENT_ROOT=/home/site/wwwroot
 ENV APACHE_SITE_ROOT=/home/site/
-
 ENV WP_CONTENT_ROOT=/home/site/wwwroot/wp-content
 
-RUN { \
-# https://www.php.net/manual/en/errorfunc.constants.php
-# https://github.com/docker-library/wordpress/issues/420#issuecomment-517839670
-		echo 'error_reporting = E_ERROR | E_WARNING | E_PARSE | E_CORE_ERROR | E_CORE_WARNING | E_COMPILE_ERROR | E_COMPILE_WARNING | E_RECOVERABLE_ERROR'; \
-		echo 'upload_max_filesize=128M'; \
-		echo 'memory_limit=512M'; \
-		echo 'post_max_size=1024M'; \
-		echo 'max_execution_time=900'; \
-		echo 'max_input_time=900'; \
-		echo 'display_errors = Off'; \
-		echo 'display_startup_errors = Off'; \
-		echo 'log_errors = On'; \
-		echo 'error_log = ${APACHE_LOG_DIR}/php-error.log'; \
-		echo 'log_errors_max_len = 1024'; \
-		echo 'ignore_repeated_errors = On'; \
-		echo 'ignore_repeated_source = Off'; \
-		echo 'html_errors = Off'; \
-	} > /usr/local/etc/php/conf.d/error-logging.ini
+# Copy PHP conf templates
+COPY file-templates/php/conf.d/opcache-recommended.ini /usr/local/etc/php/conf.d/opcache-recommended.ini
+COPY file-templates/php/conf.d/error-logging.ini /usr/local/etc/php/conf.d/error-logging.ini
 
+# Copy Apache conf templates
+COPY file-templates/apache/other-vhosts-access-log.conf /etc/apache2/conf-enabled/other-vhosts-access-log.conf
+COPY file-templates/apache/apache2-extra.conf /etc/apache2/conf-available/apache2-extra.conf
+COPY file-templates/apache/remoteip.conf /etc/apache2/conf-available/remoteip.conf
+
+# Provide wp-config template for init script
+COPY file-templates/wp-config-docker.php /usr/src/wordpress/wp-config-docker.php
+
+# Enable Apache modules and configs
 RUN set -eux; \
-	a2enmod rewrite expires headers; \
-	echo 'CustomLog /dev/null combined' > /etc/apache2/conf-enabled/other-vhosts-access-log.conf; \
-  	{ \
-		echo 'ServerSignature Off'; \
-# these IP ranges are reserved for "private" use and should thus *usually* be safe inside Docker
-		echo 'ServerTokens Prod'; \
-		echo 'DocumentRoot ${APACHE_DOCUMENT_ROOT}'; \
-		echo 'DirectoryIndex default.htm default.html index.htm index.html index.php hostingstart.html'; \
-		echo 'CustomLog /dev/null combined'; \
-		echo '<FilesMatch "\.(?i:ph([[p]?[0-9]*|tm[l]?))$">'; \
-		echo '   SetHandler application/x-httpd-php'; \
-		echo '</FilesMatch>'; \
-		echo 'EnableMMAP Off'; \
-	} >> /etc/apache2/apache2.conf; \
-  rm -rf /etc/apache2/sites-enabled/000-default.conf; \
-	\
-# https://httpd.apache.org/docs/2.4/mod/mod_remoteip.html
-	a2enmod remoteip; \
-	{ \
-		echo 'RemoteIPHeader X-Forwarded-For'; \
-# these IP ranges are reserved for "private" use and should thus *usually* be safe inside Docker
-		echo 'RemoteIPTrustedProxy 10.0.0.0/8'; \
-		echo 'RemoteIPTrustedProxy 172.16.0.0/12'; \
-		echo 'RemoteIPTrustedProxy 192.168.0.0/16'; \
-		echo 'RemoteIPTrustedProxy 169.254.0.0/16'; \
-		echo 'RemoteIPTrustedProxy 127.0.0.0/8'; \
-	} > /etc/apache2/conf-available/remoteip.conf; \
-	a2enconf remoteip; \
-# https://github.com/docker-library/wordpress/issues/383#issuecomment-507886512
-# (replace all instances of "%h" with "%a" in LogFormat)
-	find /etc/apache2 -type f -name '*.conf' -exec sed -ri 's/([[:space:]]*LogFormat[[:space:]]+"[^"]*)%h([^"]*")/\1%a\2/g' '{}' +
+	a2enmod rewrite expires headers remoteip; \
+	a2enconf apache2-extra remoteip; \
+	# Replace %h with %a in LogFormat
+	find /etc/apache2 -type f -name '*.conf' -exec sed -ri 's/([[:space:]]*LogFormat[[:space:]]+"[^"]*)%h([^"]*")/\1%a\2/g' '{}' +; \
+	# Remove default site config
+	rm -rf /etc/apache2/sites-enabled/000-default.conf
 
-RUN \
-  echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' | tee /etc/apt/sources.list.d/newrelic.list; \
-  wget -O- https://download.newrelic.com/548C16BF.gpg | apt-key add -; \
-  apt-get update; \
-  apt-get -y install newrelic-php5; \
-  NR_INSTALL_SILENT=1 newrelic-install install; \
-  sed -i -e "s/REPLACE_WITH_REAL_KEY/\${NEWRELIC_KEY}/" \
-  -e "s/newrelic.appname[[:space:]]=[[:space:]].*/newrelic.appname=\"\${WEBSITE_HOSTNAME}\"/" \
-  -e '$anewrelic.distributed_tracing_enabled=true' \
-  -e '$anewrelic.framework.wordpress.hooks=true' \
-  -e '$anewrelic.daemon.start_timeout=5s' \
-  -e '$anewrelic.daemon.app_connect_timeout=10s' \
-  $(php -r "echo(PHP_CONFIG_FILE_SCAN_DIR);")/newrelic.ini
+# New Relic setup (best-effort)
+RUN set -eux; \
+	if command -v gpg >/dev/null 2>&1; then \
+	  install -d -m 0755 /etc/apt/keyrings; \
+	  (curl -fsSL https://download.newrelic.com/548C16BF.gpg | gpg --dearmor -o /etc/apt/keyrings/newrelic.gpg) || true; \
+	  echo 'deb [signed-by=/etc/apt/keyrings/newrelic.gpg] http://apt.newrelic.com/debian/ newrelic non-free' > /etc/apt/sources.list.d/newrelic.list; \
+	else \
+	  echo 'deb http://apt.newrelic.com/debian/ newrelic non-free' > /etc/apt/sources.list.d/newrelic.list; \
+	fi; \
+	apt-get update || true; \
+	if apt-get -y install newrelic-php5; then \
+	  NR_INSTALL_SILENT=1 newrelic-install install || true; \
+	  if [ -f "$(php -r "echo(PHP_CONFIG_FILE_SCAN_DIR);")/newrelic.ini" ]; then \
+	    sed -i -e "s/REPLACE_WITH_REAL_KEY/\${NEWRELIC_KEY}/" \
+	    -e "s/newrelic.appname[[:space:]]=[[:space:]].*/newrelic.appname=\"\${WEBSITE_HOSTNAME}\"/" \
+	    -e '$anewrelic.distributed_tracing_enabled=true' \
+	    -e '$anewrelic.framework.wordpress.hooks=true' \
+	    -e '$anewrelic.daemon.start_timeout=5s' \
+	    -e '$anewrelic.daemon.app_connect_timeout=10s' \
+	    "$(php -r "echo(PHP_CONFIG_FILE_SCAN_DIR);")/newrelic.ini" || true; \
+	  fi; \
+	else \
+	  echo 'New Relic agent install skipped (repo/package unavailable)'; \
+	fi
 
-RUN echo "root:Docker!" | chpasswd
-RUN echo fs.inotify.max_user_watches=500000 | tee -a /etc/sysctl.conf
-RUN mkdir -p /root/.unison
-RUN [ ! -e /root/.unison/default.prf ]; \
-	{ \
-    echo 'root = /home'; \
-    echo 'root = /homelive'; \
-    echo ''; \
-    echo '# Sync options'; \
-    echo 'auto=true'; \
-    echo 'backups=false'; \
-    echo 'batch=true'; \
-    echo 'contactquietly=true'; \
-    echo 'fastcheck=true'; \
-    echo 'maxthreads=10'; \
-    echo 'prefer=newer'; \
-    echo 'silent=true'; \
-    echo 'perms=0'; \
-    echo 'dontchmod=true'; \
-    echo 'owner=false'; \
-    echo ''; \
-    echo 'path=site/wwwroot'; \
-    echo 'path=LogFiles/sync'; \
-    echo ''; \
-    echo '# Files to ignore'; \
-    echo 'ignore = Path site/wwwroot/wp-content/uploads'; \
-    echo 'ignore = Path .git/*'; \
-    echo 'ignore = Path .idea/*'; \
-    echo 'ignore = Name *docker.log'; \
-    echo 'ignore = Name *___jb_tmp___*'; \
-    echo 'ignore = Name {.*,*}.sw[pon]'; \
-    echo ''; \
-    echo '# Additional user configuration'; \
-	} > /root/.unison/default.prf;
-RUN mkdir -p /home/LogFiles/sync
-RUN mkdir -p /home/LogFiles/sync/apache2
-RUN mkdir -p /home/LogFiles/sync/archive
-RUN mkdir -p /homelive/LogFiles/sync
-RUN mkdir -p /homelive/LogFiles/sync/apache2
-RUN mkdir -p /homelive/LogFiles/sync/archive
-RUN touch /homelive/LogFiles/sync/cron.log
-RUN touch /home/LogFiles/supervisor.log
-RUN touch /home/LogFiles/sync-init.log
-RUN touch /home/LogFiles/sync-init-error.log
-RUN touch /home/LogFiles/sync/supervisor.log
-RUN chmod -R 0777 /homelive
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_SITE_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+# System and Unison config via templates
+COPY file-templates/sysctl.d/99-wordpress.conf /etc/sysctl.d/99-wordpress.conf
+COPY file-templates/unison/default.prf /root/.unison/default.prf
+RUN set -eux; \
+	echo "root:Docker!" | chpasswd; \
+	mkdir -p /home/LogFiles/sync /home/LogFiles/sync/apache2 /home/LogFiles/sync/archive; \
+	mkdir -p /homelive/LogFiles/sync /homelive/LogFiles/sync/apache2 /homelive/LogFiles/sync/archive; \
+	touch /homelive/LogFiles/sync/cron.log /home/LogFiles/supervisor.log /home/LogFiles/sync-init.log /home/LogFiles/sync-init-error.log /home/LogFiles/sync/supervisor.log; \
+	chmod -R 0777 /homelive; \
+	sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf; \
+	sed -ri -e 's!/var/www/!${APACHE_SITE_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
 RUN mkdir -p /tmp
 COPY sshd_config /etc/ssh/
@@ -237,23 +170,52 @@ COPY logrotate.d /etc/logrotate.d
 COPY DigiCertGlobalRootG2.crt.pem /usr/
 COPY DigiCertGlobalRootCA.crt.pem /usr/
 
-ENV WEBSITE_ROLE_INSTANCE_ID localRoleInstance
-ENV WEBSITE_INSTANCE_ID localInstance
-COPY --chown=www-data:www-data wp-config-docker.php /usr/src/wordpress/
+# Bundle the monitor plugin (optional auto-activation at runtime)
+COPY wordpress-plugin/wordpress-azure-monitor /opt/wordpress-azure-monitor
+
+ENV WEBSITE_ROLE_INSTANCE_ID=localRoleInstance
+ENV WEBSITE_INSTANCE_ID=localInstance
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY scripts/fix-wordpress-permissions.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/fix-wordpress-permissions.sh
 COPY scripts/sync-init.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/sync-init.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/fix-wordpress-permissions.sh /usr/local/bin/sync-init.sh
 
 # RUN (crontab -l -u root; echo "*/10 * * * * . /etc/profile; fix-wordpress-permissions.sh /homelive/site/wwwroot > /dev/null") | crontab
 
-ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 WORKDIR /homelive/site/wwwroot
 
 EXPOSE 2222 80
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://localhost/ || exit 1
+
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["/usr/bin/supervisord"]
+
+# --- Dev variant (extra tools, composer, xdebug, and dev PHP overrides) ---
+FROM runtime AS dev
+RUN set -eux; \
+	rm -f /etc/apt/sources.list.d/newrelic.list || true; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		git \
+		vim \
+		nano \
+		less \
+		zip \
+		unzip \
+		make \
+		procps \
+		iputils-ping \
+		netcat-openbsd; \
+	rm -rf /var/lib/apt/lists/*
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN set -eux; \
+	install-php-extensions xdebug; \
+	# dev defaults: keep errors off by default; enable fast opcache reloads
+	printf "display_errors=Off\n" > /usr/local/etc/php/conf.d/zz-dev-overrides.ini; \
+	printf "display_startup_errors=Off\n" >> /usr/local/etc/php/conf.d/zz-dev-overrides.ini; \
+	printf "error_reporting=E_ALL\n" >> /usr/local/etc/php/conf.d/zz-dev-overrides.ini; \
+	printf "opcache.validate_timestamps=1\n" >> /usr/local/etc/php/conf.d/zz-dev-overrides.ini; \
+	printf "opcache.revalidate_freq=0\n" >> /usr/local/etc/php/conf.d/zz-dev-overrides.ini

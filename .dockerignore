@@ -1,0 +1,14 @@
+# Reduce build context size
+.git
+.gitignore
+.DS_Store
+*.log
+node_modules/
+temp/
+.tmp/
+.cache/
+example/src/
+example/db_data/
+**/.vscode/
+**/.idea/
+**/vendor/

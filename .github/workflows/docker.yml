@@ -1,0 +1,107 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "Dockerfile"
+      - "docker-bake.hcl"
+      - "file-templates/**"
+      - "scripts/**"
+      - "supervisord.conf"
+      - "docker-entrypoint.sh"
+  # Promote stable/full-version tags only on git tags
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        php_version: ["8.3", "8.4"]
+    env:
+      REGISTRY: docker.io
+      IMAGE_NAME: bluegrassdigital/wordpress-azure-sync
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push (prod, multi-arch)
+        id: build_prod
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            PHP_VERSION=${{ matrix.php_version }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-latest
+            ${{ github.ref_type == 'tag' && format('{0}:{1}-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
+            ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
+
+      - name: Build and push (dev, multi-arch)
+        id: build_dev
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: dev
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            PHP_VERSION=${{ matrix.php_version }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-latest
+            ${{ github.ref_type == 'tag' && format('{0}:{1}-dev-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
+            ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
+
+      - name: Resolve full PHP version from prod image
+        id: phpver_prod
+        env:
+          IMAGE: ${{ env.IMAGE_NAME }}
+        run: |
+          FULL=$(docker run --rm $IMAGE:${{ matrix.php_version }}-build-${{ github.sha }} php -r 'echo PHP_VERSION;')
+          echo "full=$FULL" >> $GITHUB_OUTPUT
+
+      - name: Resolve full PHP version from dev image
+        id: phpver_dev
+        env:
+          IMAGE: ${{ env.IMAGE_NAME }}
+        run: |
+          FULL=$(docker run --rm $IMAGE:${{ matrix.php_version }}-dev-build-${{ github.sha }} php -r 'echo PHP_VERSION;')
+          echo "full=$FULL" >> $GITHUB_OUTPUT
+
+      - name: Add tag with full PHP version (prod, multi-arch)
+        env:
+          IMAGE: ${{ env.IMAGE_NAME }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then \
+            docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_prod.outputs.full }} $IMAGE:${{ matrix.php_version }}-build-${{ github.sha }}; \
+          fi
+
+      - name: Add tag with full PHP version (dev, multi-arch)
+        env:
+          IMAGE: ${{ env.IMAGE_NAME }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then \
+            docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-build-${{ github.sha }}; \
+          fi
