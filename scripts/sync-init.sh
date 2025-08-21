@@ -13,7 +13,11 @@ WP_CONTENT_ROOT_LIVE=$(echo $WP_CONTENT_ROOT | sed -e "s/\/home\//\/homelive\//g
 mkdir -p "$WP_CONTENT_ROOT/uploads"
 mkdir -p "$WP_CONTENT_ROOT_LIVE"
 
-ln -s "$WP_CONTENT_ROOT/uploads" "$WP_CONTENT_ROOT_LIVE"
+# Ensure uploads symlink exists in live path and points to persisted /home path
+if [[ ! -L "$WP_CONTENT_ROOT_LIVE/uploads" ]]; then
+    rm -rf "$WP_CONTENT_ROOT_LIVE/uploads" 2>/dev/null || true
+    ln -s "$WP_CONTENT_ROOT/uploads" "$WP_CONTENT_ROOT_LIVE/uploads" || true
+fi
 
 if [[ -z "${DOCKER_SYNC_ENABLED}" ]]; then
 cat >/home/syncstatus <<EOL
@@ -51,6 +55,15 @@ if [[ ! -f "/home/site/wwwroot/wp-config.php" ]]; then
 fi
 
 echo "$(date) Sync disabled - init complete"
+
+# Ensure bundled plugin exists and optionally auto-activate (sync disabled path)
+if [[ -d "/opt/wordpress-azure-monitor" ]]; then
+    mkdir -p /home/site/wwwroot/wp-content/plugins
+    rsync -a /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ || true
+fi
+if [[ -n "${WAZM_AUTO_ACTIVATE}" && "${WAZM_AUTO_ACTIVATE}" == "1" ]]; then
+    WP_CLI_ALLOW_ROOT=1 sh -lc "cd '/home/site/wwwroot' && wp core is-installed --quiet && wp plugin activate wordpress-azure-monitor --quiet" || true
+fi
 else
 SECONDS=0
 echo "$(date) Sync enabled - init start"
@@ -110,7 +123,11 @@ fix-wordpress-permissions.sh $APACHE_DOCUMENT_ROOT_LIVE
 
 echo "$(date) Updating Apache to point to homelive rather than home"
 
-ln -s "$WP_CONTENT_ROOT/uploads" "$WP_CONTENT_ROOT_LIVE"
+# Re-ensure uploads symlink without erroring if it already exists
+if [[ ! -L "$WP_CONTENT_ROOT_LIVE/uploads" ]]; then
+    rm -rf "$WP_CONTENT_ROOT_LIVE/uploads" 2>/dev/null || true
+    ln -s "$WP_CONTENT_ROOT/uploads" "$WP_CONTENT_ROOT_LIVE/uploads" || true
+fi
 
 APACHE_SITE_ROOT_LIVE=$(echo $APACHE_SITE_ROOT | sed -e "s/\/home\//\/homelive\//g")
 APACHE_LOG_DIR_LIVE=$(echo $APACHE_LOG_DIR | sed -e "s/\/home\//\/homelive\//g")
@@ -136,6 +153,13 @@ else
 fi
 
 supervisorctl restart apache2
+
+# Ensure bundled WordPress Azure Monitor plugin is available on persistent storage
+if [[ -d "/opt/wordpress-azure-monitor" ]]; then
+    mkdir -p /home/site/wwwroot/wp-content/plugins /homelive/site/wwwroot/wp-content/plugins
+    rsync -a /opt/wordpress-azure-monitor/ /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ || true
+    rsync -a /opt/wordpress-azure-monitor/ /homelive/site/wwwroot/wp-content/plugins/wordpress-azure-monitor/ || true
+fi
 
 if [[ "${USE_SYSTEM_CRON:-1}" == "1" || "${USE_SYSTEM_CRON:-1}" == "true" ]]; then
   (crontab -l; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
