@@ -22,7 +22,7 @@ RUN set -eux; \
 	if [ -x /usr/bin/unison-fsmonitor ]; then install -Dm755 /usr/bin/unison-fsmonitor /out/unison-fsmonitor; else echo 'echo "unison-fsmonitor not available; unison will still function"' > /out/unison-fsmonitor && chmod +x /out/unison-fsmonitor; fi
 
 # --- Final runtime image ---
-FROM php:${PHP_VERSION}-apache AS runtime
+FROM php:${PHP_VERSION}-apache-bookworm AS runtime
 
 ARG OCI_TITLE="wordpress-azure"
 ARG OCI_DESCRIPTION="WordPress on php-apache with Azure-specific tooling (AzCopy), Unison sync, New Relic, SSH, and supervisord"
@@ -43,6 +43,7 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 # persistent dependencies
 RUN set -eux; \
 	apt-get update; \
+	apt-get -y upgrade; \
 	apt-get install -y --no-install-recommends \
 		# Ghostscript is required for rendering PDF previews
 		ghostscript \
@@ -57,6 +58,8 @@ RUN set -eux; \
 		inotify-tools \
 		rsync \
 		ca-certificates; \
+	apt-get -y purge linux-libc-dev || true; \
+	apt-get -y autoremove; \
 	rm -rf /var/lib/apt/lists/*
 
 # tools: wp-cli and AzCopy
@@ -95,6 +98,14 @@ RUN set -eux; \
     pdo \
     pdo_mysql \
     ${IMAGICK_PACKAGE} ;
+
+RUN set -eux; \
+	apt-get update; \
+	apt-get -y purge linux-libc-dev || true; \
+	devpacks=$(dpkg -l | awk '/-dev[\t ]/ {print $2}'); \
+	if [ -n "${devpacks}" ]; then apt-get -y purge ${devpacks}; fi; \
+	apt-get -y autoremove; \
+	rm -rf /var/lib/apt/lists/*
 
 # Apache and PHP config via templates
 ENV APACHE_LOG_DIR=/home/LogFiles/sync/apache2
@@ -200,6 +211,7 @@ FROM runtime AS dev
 RUN set -eux; \
 	rm -f /etc/apt/sources.list.d/newrelic.list || true; \
 	apt-get update; \
+	apt-get -y upgrade; \
 	apt-get install -y --no-install-recommends \
 		git \
 		vim \
@@ -211,6 +223,8 @@ RUN set -eux; \
 		procps \
 		iputils-ping \
 		netcat-openbsd; \
+	apt-get -y purge linux-libc-dev || true; \
+	apt-get -y autoremove; \
 	rm -rf /var/lib/apt/lists/*
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN set -eux; \
