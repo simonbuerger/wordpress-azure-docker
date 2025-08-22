@@ -15,10 +15,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: bluegrassdigital/wordpress-azure-sync
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Determine tag
         id: tag
         run: |
@@ -29,11 +28,85 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.tag.outputs.tag }}
+
       - name: Extract release notes from CHANGELOG
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
           awk "/^#### ${TAG}\$/{flag=1;next}/^#### /{flag=0}flag" CHANGELOG.md > RELEASE_NOTES.md
           echo "Release notes generated for $TAG:" && cat RELEASE_NOTES.md
+
+      - name: Append image tag references
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          COMMIT_SHA="${{ github.sha }}"
+          VERSIONS=(8.3 8.4)
+          {
+            echo "\n### Images and tags"
+            for V in "${VERSIONS[@]}"; do
+              # Resolve full PHP version by querying the built image
+              FULL_PROD=$(docker run --rm "$IMAGE_NAME:$V-build-$COMMIT_SHA" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
+              FULL_DEV=$(docker run --rm "$IMAGE_NAME:$V-dev-build-$COMMIT_SHA" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
+              echo "\n- PHP $V"
+              echo "  - Prod: \`$IMAGE_NAME:$V-latest\`, \`$IMAGE_NAME:$V-stable\`, \`$IMAGE_NAME:$V-build-$COMMIT_SHA\`, \`$IMAGE_NAME:${FULL_PROD}\`"
+              echo "  - Dev:  \`$IMAGE_NAME:$V-dev-latest\`, \`$IMAGE_NAME:$V-dev-stable\`, \`$IMAGE_NAME:$V-dev-build-$COMMIT_SHA\`, \`$IMAGE_NAME:${FULL_DEV}-dev\`"
+            done
+          } >> RELEASE_NOTES.md
+          echo "\nAppended image tags:" && tail -n +1 RELEASE_NOTES.md
+
+      - name: Trivy scan (prod 8.3)
+        uses: aquasecurity/trivy-action@0.24.0
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:8.3-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          output: trivy-8.3-prod.txt
+          exit-code: '0'
+
+      - name: Trivy scan (dev 8.3)
+        uses: aquasecurity/trivy-action@0.24.0
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:8.3-dev-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          output: trivy-8.3-dev.txt
+          exit-code: '0'
+
+      - name: Trivy scan (prod 8.4)
+        uses: aquasecurity/trivy-action@0.24.0
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:8.4-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          output: trivy-8.4-prod.txt
+          exit-code: '0'
+
+      - name: Trivy scan (dev 8.4)
+        uses: aquasecurity/trivy-action@0.24.0
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:8.4-dev-build-${{ github.sha }}
+          vuln-type: 'os,library'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          output: trivy-8.4-dev.txt
+          exit-code: '0'
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -41,5 +114,10 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
           body_path: RELEASE_NOTES.md
+          files: |
+            trivy-8.3-prod.txt
+            trivy-8.3-dev.txt
+            trivy-8.4-prod.txt
+            trivy-8.4-dev.txt
           make_latest: true
 
