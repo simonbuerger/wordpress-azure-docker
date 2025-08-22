@@ -35,10 +35,29 @@ class WAZM_Logs
             'sync'            => ['/home/LogFiles/sync/unison.log', '/homelive/LogFiles/sync/unison.log'],
             // Supervisord master log (support both roots)
             'supervisord'     => ['/home/LogFiles/supervisord.log', '/homelive/LogFiles/supervisord.log'],
-            // Sync init symlinked logs (support both roots)
-            'sync-init'       => ['/homelive/LogFiles/sync-init.log', '/home/LogFiles/sync-init.log'],
-            'sync-init-error' => ['/homelive/LogFiles/sync-init-error.log', '/home/LogFiles/sync-init-error.log'],
         ];
+
+        // Resolve latest per-run sync-init logs without relying on symlinks
+        $latestSyncInit = self::find_latest_run([
+            '/home/LogFiles/sync/runs/sync-init-*.log',
+            '/homelive/LogFiles/sync/runs/sync-init-*.log',
+        ]);
+        if ($latestSyncInit !== null) {
+            $candidates['sync-init'] = [$latestSyncInit];
+        } else {
+            // Fallback to legacy symlinks if scan fails
+            $candidates['sync-init'] = ['/homelive/LogFiles/sync-init.log', '/home/LogFiles/sync-init.log'];
+        }
+
+        $latestSyncInitErr = self::find_latest_run([
+            '/home/LogFiles/sync/runs/sync-init-error-*.log',
+            '/homelive/LogFiles/sync/runs/sync-init-error-*.log',
+        ]);
+        if ($latestSyncInitErr !== null) {
+            $candidates['sync-init-error'] = [$latestSyncInitErr];
+        } else {
+            $candidates['sync-init-error'] = ['/homelive/LogFiles/sync-init-error.log', '/home/LogFiles/sync-init-error.log'];
+        }
 
         $labels = [
             'apache-access' => 'Apache Access',
@@ -83,6 +102,32 @@ class WAZM_Logs
         wp_cache_set(self::CACHE_KEY, $map, 'wazm', self::CACHE_DURATION);
 
         return $map;
+    }
+
+    /**
+     * Find the most recent file matching any of the provided glob patterns.
+     * Returns null if none found or unreadable.
+     */
+    private static function find_latest_run(array $patterns): ?string
+    {
+        $candidates = [];
+        foreach ($patterns as $pattern) {
+            $matches = glob($pattern) ?: [];
+            foreach ($matches as $m) {
+                if (is_file($m) && is_readable($m)) {
+                    $mtime = @filemtime($m) ?: 0;
+                    $candidates[$m] = $mtime;
+                }
+            }
+        }
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        arsort($candidates, SORT_NUMERIC);
+        $best = array_key_first($candidates);
+        return $best ?: null;
     }
 
     /**

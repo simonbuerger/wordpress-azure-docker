@@ -166,7 +166,7 @@ RUN set -eux; \
 	echo "root:Docker!" | chpasswd; \
 	mkdir -p /home/LogFiles/sync /home/LogFiles/sync/apache2 /home/LogFiles/sync/archive; \
 	mkdir -p /homelive/LogFiles/sync /homelive/LogFiles/sync/apache2 /homelive/LogFiles/sync/archive; \
-	touch /homelive/LogFiles/sync/cron.log /home/LogFiles/sync/cron.log /home/LogFiles/supervisor.log /home/LogFiles/sync-init.log /home/LogFiles/sync-init-error.log /home/LogFiles/sync/supervisor.log; \
+	touch /homelive/LogFiles/sync/cron.log /home/LogFiles/sync/cron.log /home/LogFiles/supervisor.log /home/LogFiles/sync-init.log /home/LogFiles/sync-init-error.log /home/LogFiles/sync/supervisor.log /home/LogFiles/sync/unison.log /homelive/LogFiles/sync/unison.log; \
 	chmod -R 0777 /homelive; \
 	sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf; \
 	sed -ri -e 's!/var/www/!${APACHE_SITE_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf

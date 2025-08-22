@@ -60,6 +60,9 @@
                 if invoke-rc.d apache2 status > /dev/null 2>&1; then \
                     invoke-rc.d apache2 reload > /dev/null 2>&1; \
                 fi;
+                # Persist homelive archives to home (Azure Files)
+                mkdir -p /home/LogFiles/sync/archive >/dev/null 2>&1 || true; \
+                rsync -a /homelive/LogFiles/sync/archive/ /home/LogFiles/sync/archive/ >/dev/null 2>&1 || true;
         endscript
         prerotate
                 if [ -d /etc/logrotate.d/httpd-prerotate ]; then \

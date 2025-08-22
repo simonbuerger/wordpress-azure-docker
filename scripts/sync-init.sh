@@ -2,7 +2,11 @@
 
 # Per-run logging: capture the entire run to unique files under /home/LogFiles/sync
 RUN_TS=$(date +%Y%m%d-%H%M%S)
-LOG_BASE_DIR=/home/LogFiles/sync
+if [[ -n "${DOCKER_SYNC_ENABLED:-}" ]]; then
+  LOG_BASE_DIR=/homelive/LogFiles/sync
+else
+  LOG_BASE_DIR=/home/LogFiles/sync
+fi
 RUNS_DIR="$LOG_BASE_DIR/runs"
 mkdir -p "$RUNS_DIR"
 RUN_LOG="$RUNS_DIR/sync-init-$RUN_TS.log"
@@ -12,13 +16,13 @@ exec > >(tee -a "$RUN_LOG") 2> >(tee -a "$ERR_LOG" >&2)
 # Update convenient symlinks to the current run
 ln -sfn "$RUN_LOG" "$LOG_BASE_DIR/sync-init.current.log"
 ln -sfn "$ERR_LOG" "$LOG_BASE_DIR/sync-init-error.current.log"
-# Back-compat symlinks for existing consumers (plugin/configs)
-ln -sfn "$LOG_BASE_DIR/sync-init.current.log" /home/LogFiles/sync-init.log
-ln -sfn "$LOG_BASE_DIR/sync-init-error.current.log" /home/LogFiles/sync-init-error.log
-# Provide homelive-visible mirrors so admin can read latest when DOCKER_SYNC_ENABLED=1
-mkdir -p /homelive/LogFiles
-ln -sfn /home/LogFiles/sync-init.log /homelive/LogFiles/sync-init.log
-ln -sfn /home/LogFiles/sync-init-error.log /homelive/LogFiles/sync-init-error.log
+# Keep only intra-root symlinks; avoid cross-root links on Azure Files
+if [[ "$LOG_BASE_DIR" == "/homelive/LogFiles/sync" ]]; then
+  mkdir -p /home/LogFiles/sync /home/LogFiles/sync/archive || true
+  chmod -R 0777 /home/LogFiles/sync || true
+else
+  mkdir -p /homelive/LogFiles/sync /homelive/LogFiles/sync/archive || true
+fi
 
 # This script bootstraps and synchronizes WordPress between persistent storage (/home)
 # and the live working tree (/homelive).
@@ -199,11 +203,17 @@ else
   echo "$(date) Seed wp-content FAILED (non-fatal)"
 fi
 
-echo "$(date) Seeding logs: /home/LogFiles -> /homelive/LogFiles (excluding sync/runs)"
-if rsync -apoghW --no-compress /home/LogFiles/ /homelive/LogFiles/ --exclude '*.unison.tmp' --exclude 'sync/runs/**'; then
-  echo "$(date) Seeded logs OK"
+echo "$(date) Seeding logs based on mode"
+if [[ -n "${DOCKER_SYNC_ENABLED:-}" ]]; then
+  # Sync-enabled: ensure home receives archive snapshots; live writes happen in homelive
+  if rsync -apoghW --no-compress /homelive/LogFiles/ /home/LogFiles/ --exclude '*.unison.tmp'; then
+    echo "$(date) Seeded homelive -> home logs OK"
+  else
+    echo "$(date) Seed homelive -> home logs FAILED (non-fatal)"
+  fi
 else
-  echo "$(date) Seed logs FAILED (non-fatal)"
+  # No sync: operate in /home only (no cross-root copy)
+  echo "$(date) Sync disabled: logs remain in /home"
 fi
 
 APACHE_DOCUMENT_ROOT_LIVE=$(echo $APACHE_DOCUMENT_ROOT | sed -e "s/\/home\//\/homelive\//g")
@@ -267,7 +277,7 @@ fi
 
 if [[ "${USE_SYSTEM_CRON:-1}" == "1" || "${USE_SYSTEM_CRON:-1}" == "true" ]]; then
   log_info "Installing WP cron (every 10m) for /homelive path"
-  (crontab -l 2>/dev/null; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /home/LogFiles/sync/cron.log  2>&1") | crontab
+  (crontab -l 2>/dev/null; echo "*/10 * * * * . /etc/profile; (/bin/date && cd /homelive/site/wwwroot && /usr/local/bin/wp --allow-root cron event run --due-now) | grep -v \"Warning:\" >> /homelive/LogFiles/sync/cron.log  2>&1") | crontab
 fi
 
 (crontab -l 2>/dev/null; echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/apache2 > /dev/null") | crontab
@@ -287,6 +297,16 @@ if [[ -n "${WAZM_AUTO_ACTIVATE}" && "${WAZM_AUTO_ACTIVATE}" == "1" ]]; then
 	# Then try home (dev path)
 	log_info "Attempting auto-activate wordpress-azure-monitor on /home if core is installed"
 	WP_CLI_ALLOW_ROOT=1 sh -lc "cd '/home/site/wwwroot' && wp core is-installed --quiet && wp plugin activate wordpress-azure-monitor --quiet" && log_info "Plugin auto-activated on /home" || log_warn "Plugin auto-activation on /home skipped/failed"
+fi
+
+# If sync is enabled, persist per-run logs to /home for durability and UI
+if [[ -n "${DOCKER_SYNC_ENABLED:-}" ]]; then
+  mkdir -p /home/LogFiles/sync/runs || true
+  if rsync -apoghW --no-compress /homelive/LogFiles/sync/runs/ /home/LogFiles/sync/runs/; then
+    log_info "Persisted per-run logs to /home"
+  else
+    log_warn "Failed to persist per-run logs to /home (continuing)"
+  fi
 fi
 
 cat >/home/syncstatus <<EOL
