@@ -32,8 +32,8 @@ class WAZM_Logs
             // Prefer /home for cron since writers append there; include homelive as fallback snapshot
             // If homelive exists and is non-empty, prefer it (sync enabled path)
             'cron'            => ['/homelive/LogFiles/sync/cron.log', '/home/LogFiles/sync/cron.log', '/home/LogFiles/cron.log'],
-            // Unison runtime log (written by supervisord program:sync)
-            'sync'            => ['/home/LogFiles/sync/unison.log', '/homelive/LogFiles/sync/unison.log'],
+            // Unison runtime log (written by supervisord program:sync) — prefer homelive
+            'sync'            => ['/homelive/LogFiles/sync/unison.log', '/home/LogFiles/sync/unison.log'],
             // Supervisord master log (support both roots)
             'supervisord'     => ['/home/LogFiles/supervisord.log', '/homelive/LogFiles/supervisord.log'],
         ];
