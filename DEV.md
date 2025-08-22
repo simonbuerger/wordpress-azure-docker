@@ -2,6 +2,10 @@
 
 Local development workflow for the dev image variant (composer, xdebug, tools).
 
+#### Editor configuration
+This repository includes an `.editorconfig` file so that compatible editors automatically
+apply the project's formatting conventions. Ensure your editor supports EditorConfig.
+
 #### Quick start (using Hub image)
 ```bash
 cd example
@@ -36,6 +40,4 @@ docker compose exec --user www-data -w /home/site/wwwroot wordpress wp plugin li
 #### Troubleshooting
 - 403 after first boot: ensure WordPress files exist in `/homelive/site/wwwroot`; rerun sync by restarting container.
 - DB connect errors: verify `WORDPRESS_CONFIG_EXTRA` overrides and the `db` service is healthy.
-- No admin bar badge: ensure plugin is active and check `/home/LogFiles/sync` logs.
-
-
+ - No admin bar badge: ensure plugin is active and check `/home/LogFiles/sync` logs.
