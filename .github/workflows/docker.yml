@@ -134,10 +134,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}]
-                  | sort_by(.Severity) | reverse | .[0:20]
-                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |")
-                  | .[]' trivy-prod.json >> $GITHUB_STEP_SUMMARY
+          jq -r '
+            [.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
+            | sort_by(.Severity) | reverse | .[0:20] 
+            | .[] 
+            | "| \(.PkgName) | \(.Severity) | \(.InstalledVersion // "-") | \(.FixedVersion // "-") | [\(.VulnerabilityID)](\(.PrimaryURL // "")) | \(.Title // "") |"
+          ' trivy-prod.json >> $GITHUB_STEP_SUMMARY
 
       - name: Trivy scan (dev - json)
         uses: aquasecurity/trivy-action@0.24.0
@@ -165,10 +167,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}]
-                  | sort_by(.Severity) | reverse | .[0:20]
-                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |")
-                  | .[]' trivy-dev.json >> $GITHUB_STEP_SUMMARY
+          jq -r '
+            [.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
+            | sort_by(.Severity) | reverse | .[0:20] 
+            | .[] 
+            | "| \(.PkgName) | \(.Severity) | \(.InstalledVersion // "-") | \(.FixedVersion // "-") | [\(.VulnerabilityID)](\(.PrimaryURL // "")) | \(.Title // "") |"
+          ' trivy-dev.json >> $GITHUB_STEP_SUMMARY
 
       - name: Trivy SARIF (prod image)
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
