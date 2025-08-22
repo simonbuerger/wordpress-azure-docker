@@ -134,9 +134,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
-                  | sort_by(.Severity) | reverse | .[0:20] 
-                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |") 
+          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}]
+                  | sort_by(.Severity) | reverse | .[0:20]
+                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |")
                   | .[]' trivy-prod.json >> $GITHUB_STEP_SUMMARY
 
       - name: Trivy scan (dev - json)
@@ -165,9 +165,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
-                  | sort_by(.Severity) | reverse | .[0:20] 
-                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |") 
+          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}]
+                  | sort_by(.Severity) | reverse | .[0:20]
+                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |")
                   | .[]' trivy-dev.json >> $GITHUB_STEP_SUMMARY
 
       - name: Trivy SARIF (prod image)
@@ -182,11 +182,20 @@ jobs:
           output: trivy-prod.sarif
           exit-code: '0'
 
+      - name: Sanitize SARIF (prod)
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y >/dev/null
+            sudo apt-get install -y jq >/dev/null
+          fi
+          jq 'del(.runs[].automationDetails)' trivy-prod.sarif > trivy-prod.cleaned.sarif
+
       - name: Upload SARIF (prod)
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-prod.sarif
+          sarif_file: trivy-prod.cleaned.sarif
           category: trivy-prod-${{ matrix.php_version }}
 
       - name: Trivy SARIF (dev image)
@@ -201,9 +210,18 @@ jobs:
           output: trivy-dev.sarif
           exit-code: '0'
 
+      - name: Sanitize SARIF (dev)
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y >/dev/null
+            sudo apt-get install -y jq >/dev/null
+          fi
+          jq 'del(.runs[].automationDetails)' trivy-dev.sarif > trivy-dev.cleaned.sarif
+
       - name: Upload SARIF (dev)
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-dev.sarif
+          sarif_file: trivy-dev.cleaned.sarif
           category: trivy-dev-${{ matrix.php_version }}
