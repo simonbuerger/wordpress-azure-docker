@@ -47,18 +47,41 @@ jobs:
           set -euo pipefail
           COMMIT_SHA="${{ github.sha }}"
           VERSIONS=(8.3 8.4)
+          DOCKER_HUB_BASE="https://hub.docker.com/r/${IMAGE_NAME}/tags?name="
+
+          # Find previous release tag for compare link
+          PREV_TAG=$(git tag --list 'v*' --sort=-creatordate | awk -v cur="$TAG" 'BEGIN{found=0} { if(found==1){ print $0; exit } if($0==cur){ found=1 } }')
+
+          # Prepend compare link if previous tag exists
+          if [ -n "${PREV_TAG:-}" ]; then
+            tmpfile=$(mktemp)
+            printf "### Changes since last release\n\n[Compare %s...%s](https://github.com/%s/compare/%s...%s)\n\n" "$PREV_TAG" "$TAG" "${GITHUB_REPOSITORY}" "$PREV_TAG" "$TAG" > "$tmpfile"
+            cat RELEASE_NOTES.md >> "$tmpfile"
+            mv "$tmpfile" RELEASE_NOTES.md
+          fi
+
           {
-            echo "\n### Images and tags"
+            printf "\n### Images and tags\n\n"
             for V in "${VERSIONS[@]}"; do
-              # Resolve full PHP version by querying the built image
+              # Resolve full PHP version by querying the built image (best-effort)
               FULL_PROD=$(docker run --rm "$IMAGE_NAME:$V-build-$COMMIT_SHA" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
               FULL_DEV=$(docker run --rm "$IMAGE_NAME:$V-dev-build-$COMMIT_SHA" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
-              echo "\n- PHP $V"
-              echo "  - Prod: \`$IMAGE_NAME:$V-latest\`, \`$IMAGE_NAME:$V-stable\`, \`$IMAGE_NAME:$V-build-$COMMIT_SHA\`, \`$IMAGE_NAME:${FULL_PROD}\`"
-              echo "  - Dev:  \`$IMAGE_NAME:$V-dev-latest\`, \`$IMAGE_NAME:$V-dev-stable\`, \`$IMAGE_NAME:$V-dev-build-$COMMIT_SHA\`, \`$IMAGE_NAME:${FULL_DEV}-dev\`"
+
+              printf "- PHP %s\n" "$V"
+              printf "  - Prod: [\`%s:%s-latest\`](%s%s-latest), [\`%s:%s-stable\`](%s%s-stable), [\`%s:%s-build-%s\`](%s%s-build-%s), [\`%s:%s\`](%s%s)\n" \
+                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
+                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
+                "$IMAGE_NAME" "$V" "$COMMIT_SHA" "$DOCKER_HUB_BASE" "$V" "$COMMIT_SHA" \
+                "$IMAGE_NAME" "$FULL_PROD" "$DOCKER_HUB_BASE" "$FULL_PROD"
+              printf "  - Dev:  [\`%s:%s-dev-latest\`](%s%s-dev-latest), [\`%s:%s-dev-stable\`](%s%s-dev-stable), [\`%s:%s-dev-build-%s\`](%s%s-dev-build-%s), [\`%s:%s-dev\`](%s%s-dev)\n" \
+                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
+                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
+                "$IMAGE_NAME" "$V" "$COMMIT_SHA" "$DOCKER_HUB_BASE" "$V" "$COMMIT_SHA" \
+                "$IMAGE_NAME" "$FULL_DEV" "$DOCKER_HUB_BASE" "$FULL_DEV"
+              printf "\n"
             done
           } >> RELEASE_NOTES.md
-          echo "\nAppended image tags:" && tail -n +1 RELEASE_NOTES.md
+          printf "Appended image tags and compare link (if available).\n"
 
       - name: Trivy scan (prod 8.3)
         uses: aquasecurity/trivy-action@0.24.0
