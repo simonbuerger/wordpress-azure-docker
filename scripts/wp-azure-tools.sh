@@ -14,9 +14,9 @@
 #   ensure-uploads               Ensure /homelive uploads symlink → /home uploads
 #   run-cron [home|homelive]     Run WP cron due-now in selected tree (defaults based on DOCKER_SYNC_ENABLED)
 #   seed-logs                    Rotate then seed logs from /home to /homelive
-#   seed-content                 Seed code and wp-content (excl. uploads) from /home to /homelive
-#   bootstrap-core [-f]          Download/refresh WP core into /home/site/wwwroot (-f to force)
-#   bootstrap-config [-f]        Recreate wp-config.php from docker template (-f to overwrite)
+#   seed-content                 Seed code and wp-content (excl. uploads) between trees (direction depends on sync)
+#   bootstrap-core [-f]          Download/refresh WP core in active tree (-f to force)
+#   bootstrap-config [-f]        Create/refresh wp-config.php in active tree (-f to overwrite)
 #
 # Notes:
 # - Safe by default; commands log their actions and continue on minor failures.
@@ -26,6 +26,25 @@ set -o pipefail
 log_info() { echo "$(date) [INFO] $*"; }
 log_warn() { echo "$(date) [WARN] $*"; }
 log_error() { echo "$(date) [ERROR] $*"; }
+
+# Return 0 if DOCKER_SYNC_ENABLED is truthy, else 1
+sync_enabled() {
+    case "${DOCKER_SYNC_ENABLED:-}" in
+        1|true|TRUE|True|yes|YES|on|ON)
+            return 0 ;;
+        *)
+            return 1 ;;
+    esac
+}
+
+# Get active WP tree root depending on sync mode
+get_wp_root() {
+    if sync_enabled; then
+        echo "/homelive/site/wwwroot"
+    else
+        echo "/home/site/wwwroot"
+    fi
+}
 
 # Resolve live paths based on /home → /homelive rewrite
 derive_live_paths() {
@@ -147,15 +166,23 @@ cmd_seed_logs() {
 
 cmd_seed_content() {
 	derive_live_paths
-	log_info "Seeding code: /home/site/wwwroot -> /homelive/site/wwwroot (excluding wp-content)"
-	rsync -apoghW --no-compress /home/site/wwwroot/ /homelive/site/wwwroot/ --exclude 'wp-content' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0755,F0644" && log_info "Code seeded" || log_warn "Code seeding failed"
-	log_info "Seeding wp-content: ${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content} -> $WP_CONTENT_ROOT_LIVE (excluding uploads)"
-	rsync -apoghW --no-compress "${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content}/" "$WP_CONTENT_ROOT_LIVE/" --exclude 'uploads' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0775,F0664" && log_info "wp-content seeded" || log_warn "wp-content seeding failed"
+	if sync_enabled; then
+		log_info "Seeding code: /homelive/site/wwwroot -> /home/site/wwwroot (excluding wp-content)"
+		rsync -apoghW --no-compress /homelive/site/wwwroot/ /home/site/wwwroot/ --exclude 'wp-content' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0755,F0644" && log_info "Code seeded" || log_warn "Code seeding failed"
+		log_info "Seeding wp-content: $WP_CONTENT_ROOT_LIVE -> ${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content} (excluding uploads)"
+		rsync -apoghW --no-compress "$WP_CONTENT_ROOT_LIVE/" "${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content}/" --exclude 'uploads' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0775,F0664" && log_info "wp-content seeded" || log_warn "wp-content seeding failed"
+	else
+		log_info "Seeding code: /home/site/wwwroot -> /homelive/site/wwwroot (excluding wp-content)"
+		rsync -apoghW --no-compress /home/site/wwwroot/ /homelive/site/wwwroot/ --exclude 'wp-content' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0755,F0644" && log_info "Code seeded" || log_warn "Code seeding failed"
+		log_info "Seeding wp-content: ${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content} -> $WP_CONTENT_ROOT_LIVE (excluding uploads)"
+		rsync -apoghW --no-compress "${WP_CONTENT_ROOT:-/home/site/wwwroot/wp-content}/" "$WP_CONTENT_ROOT_LIVE/" --exclude 'uploads' --exclude '*.unison.tmp' --chown "www-data:www-data" --chmod "D0775,F0664" && log_info "wp-content seeded" || log_warn "wp-content seeding failed"
+	fi
 }
 
 cmd_bootstrap_core() {
     local force="$1"
-    local target="/home/site/wwwroot"
+    local target
+    target="$(get_wp_root)"
     mkdir -p "$target"
     if [[ -f "$target/index.php" && "$force" != "-f" && "$force" != "--force" ]]; then
         log_info "Core already present at $target (use -f to force re-download)"
@@ -171,7 +198,9 @@ cmd_bootstrap_core() {
 
 cmd_bootstrap_config() {
     local force="$1"
-    local target="/home/site/wwwroot/wp-config.php"
+    local wp_root
+    wp_root="$(get_wp_root)"
+    local target="$wp_root/wp-config.php"
     if [[ -f "$target" && "$force" != "-f" && "$force" != "--force" ]]; then
         log_info "wp-config.php already exists (use -f to overwrite)"
         return 0
@@ -180,6 +209,7 @@ cmd_bootstrap_config() {
         log_info "Copying docker wp-config template to $target"
         if cp /usr/src/wordpress/wp-config-docker.php "$target"; then
             log_info "wp-config.php written"
+            ( cd "$wp_root" && /usr/local/bin/wp --allow-root config shuffle-salts ) && log_info "Salts shuffled" || log_warn "Salt shuffle failed"
         else
             log_warn "Failed to write wp-config.php"
         fi
@@ -189,9 +219,9 @@ cmd_bootstrap_config() {
         local DB_USER=${DB_USERNAME:-wordpress}
         local DB_PASS=${DB_PASSWORD:-wordpress}
         local DB_HOST=${DB_HOST:-db}
-        if ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" --dbhost="$DB_HOST" --skip-check --force ); then
+        if ( cd "$wp_root" && /usr/local/bin/wp --allow-root config create --dbname="$DB_NAME" --dbuser="$DB_USER" --dbpass="$DB_PASS" --dbhost="$DB_HOST" --skip-check --force ); then
             log_info "wp-config.php generated"
-            ( cd /home/site/wwwroot && /usr/local/bin/wp --allow-root config shuffle-salts ) && log_info "Salts shuffled" || log_warn "Salt shuffle failed"
+            ( cd "$wp_root" && /usr/local/bin/wp --allow-root config shuffle-salts ) && log_info "Salts shuffled" || log_warn "Salt shuffle failed"
         else
             log_warn "wp-config generation failed"
         fi
@@ -210,9 +240,9 @@ Commands:
   ensure-uploads               Ensure live uploads symlink -> persisted uploads
   run-cron [home|homelive]     Run WP cron due-now in selected tree
   seed-logs                    Rotate then seed logs from /home to /homelive
-  seed-content                 Seed code and wp-content (excl. uploads) to /homelive
-  bootstrap-core [-f]          Download/refresh WP core into /home/site/wwwroot (-f to force)
-  bootstrap-config [-f]        Recreate wp-config.php from docker template (-f to overwrite)
+  seed-content                 Seed code and wp-content (excl. uploads) between trees (direction depends on sync)
+  bootstrap-core [-f]          Download/refresh WP core in active tree (-f to force)
+  bootstrap-config [-f]        Create/refresh wp-config.php in active tree (-f to overwrite)
 
 Examples:
   wp-azure-tools plugin-reinstall -a

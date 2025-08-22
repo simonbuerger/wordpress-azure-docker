@@ -28,6 +28,7 @@
         dateext
         dateformat .%Y-%m-%d
         sharedscripts
+        copytruncate
         postrotate
                 if invoke-rc.d apache2 status > /dev/null 2>&1; then \
                     invoke-rc.d apache2 reload > /dev/null 2>&1; \
@@ -54,6 +55,7 @@
         dateext
         dateformat .%Y-%m-%d
         sharedscripts
+        copytruncate
         postrotate
                 if invoke-rc.d apache2 status > /dev/null 2>&1; then \
                     invoke-rc.d apache2 reload > /dev/null 2>&1; \

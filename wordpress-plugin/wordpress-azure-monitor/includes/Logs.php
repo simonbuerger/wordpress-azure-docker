@@ -26,14 +26,18 @@ class WAZM_Logs
 
         // Prefer homelive paths (sync-enabled) and fall back to home variants
         $candidates = [
-            'apache-access' => ['/homelive/LogFiles/sync/apache2/access.log', '/home/LogFiles/sync/apache2/access.log'],
-            'apache-error'  => ['/homelive/LogFiles/sync/apache2/error.log',  '/home/LogFiles/sync/apache2/error.log'],
-            'php-error'     => ['/homelive/LogFiles/sync/apache2/php-error.log','/home/LogFiles/sync/apache2/php-error.log'],
-            'cron'          => ['/home/LogFiles/sync/cron.log', '/home/LogFiles/cron.log', '/homelive/LogFiles/sync/cron.log'],
-            'sync'          => ['/home/LogFiles/sync/supervisor.log'],
-            'supervisord'   => ['/home/LogFiles/supervisord.log'],
-            'sync-init'     => ['/home/LogFiles/sync-init.log'],
-            'sync-init-error' => ['/home/LogFiles/sync-init-error.log'],
+            'apache-access'   => ['/homelive/LogFiles/sync/apache2/access.log', '/home/LogFiles/sync/apache2/access.log'],
+            'apache-error'    => ['/homelive/LogFiles/sync/apache2/error.log',  '/home/LogFiles/sync/apache2/error.log'],
+            'php-error'       => ['/homelive/LogFiles/sync/apache2/php-error.log','/home/LogFiles/sync/apache2/php-error.log'],
+            // Prefer /home for cron since writers append there; include homelive as fallback snapshot
+            'cron'            => ['/home/LogFiles/sync/cron.log', '/home/LogFiles/cron.log', '/homelive/LogFiles/sync/cron.log'],
+            // Unison runtime log (written by supervisord program:sync)
+            'sync'            => ['/home/LogFiles/sync/unison.log', '/homelive/LogFiles/sync/unison.log'],
+            // Supervisord master log (support both roots)
+            'supervisord'     => ['/home/LogFiles/supervisord.log', '/homelive/LogFiles/supervisord.log'],
+            // Sync init symlinked logs (support both roots)
+            'sync-init'       => ['/homelive/LogFiles/sync-init.log', '/home/LogFiles/sync-init.log'],
+            'sync-init-error' => ['/homelive/LogFiles/sync-init-error.log', '/home/LogFiles/sync-init-error.log'],
         ];
 
         $labels = [

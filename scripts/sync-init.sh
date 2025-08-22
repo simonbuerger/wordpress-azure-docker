@@ -15,6 +15,10 @@ ln -sfn "$ERR_LOG" "$LOG_BASE_DIR/sync-init-error.current.log"
 # Back-compat symlinks for existing consumers (plugin/configs)
 ln -sfn "$LOG_BASE_DIR/sync-init.current.log" /home/LogFiles/sync-init.log
 ln -sfn "$LOG_BASE_DIR/sync-init-error.current.log" /home/LogFiles/sync-init-error.log
+# Provide homelive-visible mirrors so admin can read latest when DOCKER_SYNC_ENABLED=1
+mkdir -p /homelive/LogFiles
+ln -sfn /home/LogFiles/sync-init.log /homelive/LogFiles/sync-init.log
+ln -sfn /home/LogFiles/sync-init-error.log /homelive/LogFiles/sync-init-error.log
 
 # This script bootstraps and synchronizes WordPress between persistent storage (/home)
 # and the live working tree (/homelive).
@@ -201,9 +205,9 @@ if rsync -apoghW --no-compress /home/LogFiles/ /homelive/LogFiles/ --exclude '*.
 else
   echo "$(date) Seed logs FAILED (non-fatal)"
 fi
-log_info "Fixing directory permissions for '$APACHE_DOCUMENT_ROOT_LIVE'"
 
 APACHE_DOCUMENT_ROOT_LIVE=$(echo $APACHE_DOCUMENT_ROOT | sed -e "s/\/home\//\/homelive\//g")
+log_info "Fixing directory permissions for '$APACHE_DOCUMENT_ROOT_LIVE'"
 
 if fix-wordpress-permissions.sh $APACHE_DOCUMENT_ROOT_LIVE; then
   log_info "Permissions fixed"
