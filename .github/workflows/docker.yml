@@ -157,6 +157,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-prod.sarif
+          category: trivy-prod-${{ matrix.php_version }}
 
       - name: Trivy SARIF (dev image)
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
@@ -175,3 +176,4 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-dev.sarif
+          category: trivy-dev-${{ matrix.php_version }}
