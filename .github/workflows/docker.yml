@@ -108,39 +108,67 @@ jobs:
             docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-build-${{ github.sha }}; \
           fi
 
-      - name: Trivy scan (prod - summary markdown)
+      - name: Trivy scan (prod - json)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-          format: 'template'
-          template: '@/contrib/github.tpl'
-          output: trivy-prod.md
+          format: 'json'
+          output: trivy-prod.json
           exit-code: '0'
 
       - name: Trivy Summary (prod)
         run: |
+          set -e
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y >/dev/null
+            sudo apt-get install -y jq >/dev/null
+          fi
+          TOTAL=$(jq '[.Results[].Vulnerabilities[]?] | length' trivy-prod.json)
+          HIGH=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-prod.json)
+          CRIT=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-prod.json)
           echo "### Trivy scan (prod) for PHP ${{ matrix.php_version }}" >> $GITHUB_STEP_SUMMARY
-          cat trivy-prod.md >> $GITHUB_STEP_SUMMARY
+          echo "Total: ${TOTAL} (HIGH: ${HIGH}, CRITICAL: ${CRIT})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
+                  | sort_by(.Severity) | reverse | .[0:20] 
+                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |") 
+                  | .[]' trivy-prod.json >> $GITHUB_STEP_SUMMARY
 
-      - name: Trivy scan (dev - summary markdown)
+      - name: Trivy scan (dev - json)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-          format: 'template'
-          template: '@/contrib/github.tpl'
-          output: trivy-dev.md
+          format: 'json'
+          output: trivy-dev.json
           exit-code: '0'
 
       - name: Trivy Summary (dev)
         run: |
+          set -e
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y >/dev/null
+            sudo apt-get install -y jq >/dev/null
+          fi
+          TOTAL=$(jq '[.Results[].Vulnerabilities[]?] | length' trivy-dev.json)
+          HIGH=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-dev.json)
+          CRIT=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-dev.json)
           echo "### Trivy scan (dev) for PHP ${{ matrix.php_version }}" >> $GITHUB_STEP_SUMMARY
-          cat trivy-dev.md >> $GITHUB_STEP_SUMMARY
+          echo "Total: ${TOTAL} (HIGH: ${HIGH}, CRITICAL: ${CRIT})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          jq -r '[.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
+                  | sort_by(.Severity) | reverse | .[0:20] 
+                  | map("| \(.PkgName) | \(.Severity) | \(.InstalledVersion // \"-\") | \(.FixedVersion // \"-\") | [\(.VulnerabilityID)](\(.PrimaryURL // \"\")) | \(.Title // \"\") |") 
+                  | .[]' trivy-dev.json >> $GITHUB_STEP_SUMMARY
 
       - name: Trivy SARIF (prod image)
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
