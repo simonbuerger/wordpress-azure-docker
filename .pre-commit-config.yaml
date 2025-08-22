@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/pre-commit/mirrors-shellcheck
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        files: ^(scripts/.*|docker-entrypoint.sh)$
+
+  - repo: https://github.com/pre-commit/mirrors-phpcs
+    rev: v3.7.2
+    hooks:
+      - id: phpcs
+        args: [--standard=PSR12]
+        files: ^wordpress-plugin/wordpress-azure-monitor/
+
+  - repo: https://github.com/pre-commit/mirrors-phpstan
+    rev: 1.10.57
+    hooks:
+      - id: phpstan
+        files: ^wordpress-plugin/wordpress-azure-monitor/
