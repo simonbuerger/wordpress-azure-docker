@@ -41,10 +41,10 @@
         endscript
 }
 
-/homelive/LogFiles/sync/*.log
-/homelive/LogFiles/sync/apache2/*.log
+ /homelive/LogFiles/sync/*.log
+ /homelive/LogFiles/sync/apache2/*.log
 {
-        su www-data www-data
+        su root root
         daily
         missingok
         rotate 14

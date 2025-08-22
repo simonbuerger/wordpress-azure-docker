@@ -30,7 +30,8 @@ class WAZM_Logs
             'apache-error'    => ['/homelive/LogFiles/sync/apache2/error.log',  '/home/LogFiles/sync/apache2/error.log'],
             'php-error'       => ['/homelive/LogFiles/sync/apache2/php-error.log','/home/LogFiles/sync/apache2/php-error.log'],
             // Prefer /home for cron since writers append there; include homelive as fallback snapshot
-            'cron'            => ['/home/LogFiles/sync/cron.log', '/home/LogFiles/cron.log', '/homelive/LogFiles/sync/cron.log'],
+            // If homelive exists and is non-empty, prefer it (sync enabled path)
+            'cron'            => ['/homelive/LogFiles/sync/cron.log', '/home/LogFiles/sync/cron.log', '/home/LogFiles/cron.log'],
             // Unison runtime log (written by supervisord program:sync)
             'sync'            => ['/home/LogFiles/sync/unison.log', '/homelive/LogFiles/sync/unison.log'],
             // Supervisord master log (support both roots)
@@ -73,6 +74,15 @@ class WAZM_Logs
         $map = [];
         foreach ($candidates as $key => $paths) {
             foreach ($paths as $p) {
+                if ($key === 'cron') {
+                    // For cron, require non-empty file to avoid preferring a 0B placeholder
+                    if (is_file($p) && is_readable($p)) {
+                        $size = filesize($p);
+                        if ($size !== false && $size === 0) {
+                            continue;
+                        }
+                    }
+                }
                 if (is_file($p) && is_readable($p)) {
                     $map[$key] = [
                         'label' => $labels[$key],
