@@ -116,7 +116,7 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
           format: 'template'
-          template: '@contrib/github.tpl'
+          template: '@/contrib/github.tpl'
           output: trivy-prod.md
           exit-code: '0'
 
@@ -133,7 +133,7 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
           format: 'template'
-          template: '@contrib/github.tpl'
+          template: '@/contrib/github.tpl'
           output: trivy-dev.md
           exit-code: '0'
 
