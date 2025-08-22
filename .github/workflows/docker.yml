@@ -108,37 +108,39 @@ jobs:
             docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-build-${{ github.sha }}; \
           fi
 
-      - name: Trivy scan (prod image - table)
+      - name: Trivy scan (prod - summary markdown)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-build-${{ github.sha }}
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-          format: 'table'
-          output: trivy-prod.txt
+          format: 'template'
+          template: '@contrib/github.tpl'
+          output: trivy-prod.md
           exit-code: '0'
 
       - name: Trivy Summary (prod)
         run: |
           echo "### Trivy scan (prod) for PHP ${{ matrix.php_version }}" >> $GITHUB_STEP_SUMMARY
-          cat trivy-prod.txt >> $GITHUB_STEP_SUMMARY
+          cat trivy-prod.md >> $GITHUB_STEP_SUMMARY
 
-      - name: Trivy scan (dev image - table)
+      - name: Trivy scan (dev - summary markdown)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-build-${{ github.sha }}
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-          format: 'table'
-          output: trivy-dev.txt
+          format: 'template'
+          template: '@contrib/github.tpl'
+          output: trivy-dev.md
           exit-code: '0'
 
       - name: Trivy Summary (dev)
         run: |
           echo "### Trivy scan (dev) for PHP ${{ matrix.php_version }}" >> $GITHUB_STEP_SUMMARY
-          cat trivy-dev.txt >> $GITHUB_STEP_SUMMARY
+          cat trivy-dev.md >> $GITHUB_STEP_SUMMARY
 
       - name: Trivy SARIF (prod image)
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
