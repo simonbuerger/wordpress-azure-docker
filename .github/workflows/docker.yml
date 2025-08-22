@@ -135,9 +135,9 @@ jobs:
           echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
           jq -r '
-            [.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
-            | sort_by(.Severity) | reverse | .[0:20] 
-            | .[] 
+            [.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}]
+            | sort_by(.Severity) | reverse | .[0:20]
+            | .[]
             | "| \(.PkgName) | \(.Severity) | \(.InstalledVersion // "-") | \(.FixedVersion // "-") | [\(.VulnerabilityID)](\(.PrimaryURL // "")) | \(.Title // "") |"
           ' trivy-prod.json >> $GITHUB_STEP_SUMMARY
 
@@ -168,9 +168,9 @@ jobs:
           echo "| Library | Severity | Installed | Fixed | ID | Title |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
           jq -r '
-            [.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}] 
-            | sort_by(.Severity) | reverse | .[0:20] 
-            | .[] 
+            [.Results[].Vulnerabilities[]? | {PkgName,Severity,InstalledVersion,FixedVersion,VulnerabilityID,Title,PrimaryURL}]
+            | sort_by(.Severity) | reverse | .[0:20]
+            | .[]
             | "| \(.PkgName) | \(.Severity) | \(.InstalledVersion // "-") | \(.FixedVersion // "-") | [\(.VulnerabilityID)](\(.PrimaryURL // "")) | \(.Title // "") |"
           ' trivy-dev.json >> $GITHUB_STEP_SUMMARY
 
