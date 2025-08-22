@@ -38,17 +38,18 @@ Operational reference for running `bluegrassdigital/wordpress-azure-sync` on Azu
 - .htaccess: WordPress normally writes this. If needed, copy our template to `/home/site/wwwroot/.htaccess` (persisted storage) from `file-templates/htaccess-template`.
 
 #### WordPress Azure Monitor plugin
-- Included in the image at `/opt/wordpress-azure-monitor`.
-- To use it, ensure the plugin directory exists under `/home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor` (persisted storage). Example one-time setup:
-```
-mkdir -p /home/site/wwwroot/wp-content/plugins
-cp -r /opt/wordpress-azure-monitor /home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor
-```
-- Auto-activation: set `WAZM_AUTO_ACTIVATE=1` in App Settings. On startup, once WordPress core is installed, the container will attempt to activate the plugin via WP‑CLI.
+- Bundled at `/opt/wordpress-azure-monitor` and mirrored to `/home/site/wwwroot/wp-content/plugins/wordpress-azure-monitor` on container start.
+- Auto-activation: set `WAZM_AUTO_ACTIVATE=1` in App Settings. Once WordPress core is installed, the container attempts to activate the plugin via WP‑CLI.
 - Manual activation (alternative):
 ```
 wp plugin activate wordpress-azure-monitor
 ```
+- To reinstall or activate after removal, run: `wp-azure-tools plugin-reinstall -a`
+
+#### wp-azure-tools CLI
+- Maintenance helper available inside the container; run `wp-azure-tools` for usage.
+- Common commands: `status`, `plugin-reinstall [-a]`, `rotate-logs`, `fix-perms`, `ensure-uploads`, `run-cron`, `seed-logs`, `seed-content`, `bootstrap-core`, `bootstrap-config`.
+- See [docs/wp-azure-tools.md](docs/wp-azure-tools.md) for details.
 
 #### Azure App Service deployment guidance
 - Use immutable per-build tags in production (e.g., `bluegrassdigital/wordpress-azure-sync:8.3-build-<git-sha>`), or pin by digest. Avoid `:latest`, `:stable`, and `:<full-php-version>` if you require strict immutability.

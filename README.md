@@ -27,11 +27,13 @@ Optimized WordPress container for Azure App Service (Linux) with App Service Sto
 - For file deploys to `/home`, restart the app/slot to pick up changes. Avoid manual rsync while Unison is running.
 
 ## Documentation
-- Operations Guide: see `OPERATIONS.md` (deployment, tags, first-time install, plugin, troubleshooting)
-- Development Guide: see `DEV.md` (local dev, example compose). For the dev variant, build the image locally when contributing:
+- Full docs by role: see [`docs/`](docs/README.md)
+- Operators: see [`OPERATIONS.md`](OPERATIONS.md) for deployment, tags, first-time install, plugin, and troubleshooting, and [`docs/wp-azure-tools.md`](docs/wp-azure-tools.md) for maintenance commands
+- Developers: see [`DEV.md`](DEV.md) for local dev and example compose. Build the dev variant locally when contributing:
   - `docker build --target dev --build-arg PHP_VERSION=8.4 -t local/wordpress-azure:8.4-dev .`
   - Then point your compose file to `local/wordpress-azure:8.4-dev`.
- - Release Process: see `RELEASING.md` (tags, changelogs, weekly vs feature releases)
+- WordPress administrators: see [`docs/wordpress-azure-monitor.md`](docs/wordpress-azure-monitor.md) for the optional Azure Monitor plugin
+- Release process: see [`RELEASING.md`](RELEASING.md) for tags, changelogs, weekly vs feature releases
 
 ## License
 MIT
