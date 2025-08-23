@@ -3,8 +3,8 @@
 Operational reference for running `bluegrassdigital/wordpress-azure-sync` on Azure App Service or similar.
 
 #### Image variants
-- Moving tags (mutable): `:8.3-latest`, `:8.4-latest`, `:8.3-dev-latest`, `:8.4-dev-latest`, `:8.x-stable`, and `:<full-php-version>` if reused across releases.
-- Immutable (per-build) tags: `:8.3-build-<git-sha>` and `:8.3-dev-build-<git-sha>`.
+- Moving tags (mutable): `:8.3-latest`, `:8.4-latest`, `:8.3-dev-latest`, `:8.4-dev-latest`, `:8.3-dev-stable`, `:8.4-dev-stable`, `:8.x-stable`, and `:<full-php-version>` if reused across releases.
+- Immutable (per-build) tags: `:8.3-build-<git-sha>`.
 - Note: `:<full-php-version>` reflects the PHP engine version inside the image (e.g., `8.3.11`) but may be retagged by newer builds that keep the same PHP version. Treat it as mutable unless you verify the digest.
 
 #### Key environment variables
