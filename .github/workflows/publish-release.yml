@@ -65,19 +65,15 @@ jobs:
             for V in "${VERSIONS[@]}"; do
               # Resolve full PHP version by querying the built image (best-effort)
               FULL_PROD=$(docker run --rm "$IMAGE_NAME:$V-build-$COMMIT_SHA" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
-              FULL_DEV=$(docker run --rm "$IMAGE_NAME:$V-dev-build-$COMMIT_SHA" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
+              FULL_DEV=$(docker run --rm "$IMAGE_NAME:$V-dev-stable" php -r 'echo PHP_VERSION;' 2>/dev/null || echo "unknown")
 
               printf "- PHP %s\n" "$V"
               printf "  - Prod: [\`%s:%s-latest\`](%s%s-latest), [\`%s:%s-stable\`](%s%s-stable), [\`%s:%s-build-%s\`](%s%s-build-%s), [\`%s:%s\`](%s%s)\n" \
                 "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
+                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \                "$IMAGE_NAME" "$FULL_PROD" "$DOCKER_HUB_BASE" "$FULL_PROD"
+              printf "  - Dev:  [\`%s:%s-dev-latest\`](%s%s-dev-latest), [\`%s:%s-dev-stable\`](%s%s-dev-stable), [\`%s:%s-dev\`](%s%s-dev)\n" \
                 "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
-                "$IMAGE_NAME" "$V" "$COMMIT_SHA" "$DOCKER_HUB_BASE" "$V" "$COMMIT_SHA" \
-                "$IMAGE_NAME" "$FULL_PROD" "$DOCKER_HUB_BASE" "$FULL_PROD"
-              printf "  - Dev:  [\`%s:%s-dev-latest\`](%s%s-dev-latest), [\`%s:%s-dev-stable\`](%s%s-dev-stable), [\`%s:%s-dev-build-%s\`](%s%s-dev-build-%s), [\`%s:%s-dev\`](%s%s-dev)\n" \
-                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
-                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \
-                "$IMAGE_NAME" "$V" "$COMMIT_SHA" "$DOCKER_HUB_BASE" "$V" "$COMMIT_SHA" \
-                "$IMAGE_NAME" "$FULL_DEV" "$DOCKER_HUB_BASE" "$FULL_DEV"
+                "$IMAGE_NAME" "$V" "$DOCKER_HUB_BASE" "$V" \                "$IMAGE_NAME" "$FULL_DEV" "$DOCKER_HUB_BASE" "$FULL_DEV"
               printf "\n"
             done
           } >> RELEASE_NOTES.md
@@ -99,7 +95,7 @@ jobs:
         uses: aquasecurity/trivy-action@0.24.0
         continue-on-error: true
         with:
-          image-ref: ${{ env.IMAGE_NAME }}:8.3-dev-build-${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}:8.3-dev-stable
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
@@ -123,7 +119,7 @@ jobs:
         uses: aquasecurity/trivy-action@0.24.0
         continue-on-error: true
         with:
-          image-ref: ${{ env.IMAGE_NAME }}:8.4-dev-build-${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}:8.4-dev-stable
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'

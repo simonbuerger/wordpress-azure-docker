@@ -85,9 +85,7 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-latest
             ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-dev-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
-            ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-stable-${{ env.BUILD_DATE }}
-
-      - name: Resolve full PHP version from prod image
+        - name: Resolve full PHP version from prod image
         id: phpver_prod
         env:
           IMAGE: ${{ env.IMAGE_NAME }}
@@ -96,11 +94,12 @@ jobs:
           echo "full=$FULL" >> $GITHUB_OUTPUT
 
       - name: Resolve full PHP version from dev image
+        if: ${{ github.ref_type == 'tag' }}
         id: phpver_dev
         env:
           IMAGE: ${{ env.IMAGE_NAME }}
         run: |
-          FULL=$(docker run --rm $IMAGE:${{ matrix.php_version }}-dev-stable-${{ env.BUILD_DATE }} php -r 'echo PHP_VERSION;')
+          FULL=$(docker run --rm $IMAGE:${{ matrix.php_version }}-dev-stable php -r 'echo PHP_VERSION;')
           echo "full=$FULL" >> $GITHUB_OUTPUT
 
       - name: Add tag with full PHP version (prod, multi-arch)
@@ -112,12 +111,11 @@ jobs:
           fi
 
       - name: Add tag with full PHP version (dev, multi-arch)
+        if: ${{ github.ref_type == 'tag' }}
         env:
           IMAGE: ${{ env.IMAGE_NAME }}
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then \
-            docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-stable-${{ env.BUILD_DATE }}; \
-          fi
+          docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-stable
 
       - name: Trivy scan (prod - json)
         uses: aquasecurity/trivy-action@0.24.0
@@ -155,7 +153,7 @@ jobs:
       - name: Trivy scan (dev - json)
         uses: aquasecurity/trivy-action@0.24.0
         with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-stable-${{ env.BUILD_DATE }}
+          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-latest
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
@@ -217,7 +215,7 @@ jobs:
         if: ${{ github.ref_type == 'tag' || github.event_name == 'schedule' }}
         uses: aquasecurity/trivy-action@0.24.0
         with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-stable-${{ env.BUILD_DATE }}
+          image-ref: ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-stable
           vuln-type: 'os,library'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
