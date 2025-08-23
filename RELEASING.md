@@ -4,13 +4,14 @@ This document defines how we ship images, manage tags, and write changelogs.
 
 #### Image tags (summary)
 - Moving tags (mutable): `:8.3-latest`, `:8.4-latest`, `:8.3-dev-latest`, `:8.4-dev-latest`, `:8.x-stable`
-- Immutable (per build): `:8.3-build-<git-sha>`, `:8.4-build-<git-sha>`, and full PHP engine tags like `:8.3.11` (prod) and `:8.3.11-dev` (dev)
+- Immutable (per build): `:8.3-stable-<YYYYMMDDHHMMSS>`, `:8.4-stable-<YYYYMMDDHHMMSS>`, `:8.3-dev-stable-<YYYYMMDDHHMMSS>`, `:8.4-dev-stable-<YYYYMMDDHHMMSS>`, and full PHP engine tags like `:8.3.11` (prod) and `:8.3.11-dev` (dev)
+  - CI sets `BUILD_DATE=$(date +%Y%m%d%H%M%S)` to generate the `<YYYYMMDDHHMMSS>` suffix
 
 Production consumers should use immutable per-build tags (or digests). Moving tags are for convenience/testing.
 
 #### Cadence
 - Weekly maintenance (automated): A scheduled CI job builds fresh images to pull in upstream security/OS/PHP updates
-  - Expected outputs: new `:8.x-latest` and `:8.x-dev-latest` and new immutable `:8.x-build-<git-sha>`/`-dev-build-<git-sha>`
+  - Expected outputs: new `:8.x-latest` and `:8.x-dev-latest` and new immutable `:8.x-stable-<YYYYMMDDHHMMSS>`/`-dev-stable-<YYYYMMDDHHMMSS>`
   - Policy: keep a moving `:8.x-stable` pointing to the latest weekly build for each supported minor version
     - Result: there is always a stable tag available that reflects the most recent weekly build
 
@@ -30,7 +31,7 @@ Note: Production users should still pin to immutable tags even though `:8.x-stab
 #### Tagging procedures
 - Weekly maintenance (automated by CI):
   - CI builds both prod and dev images for each PHP minor (e.g., 8.3, 8.4)
-  - CI publishes `:8.x-latest`/`:8.x-dev-latest`, and per-build tags `:8.x-build-<git-sha>`/`-dev-build-<git-sha>`
+  - CI publishes `:8.x-latest`/`:8.x-dev-latest` and date-stamped tags `:8.x-stable-<YYYYMMDDHHMMSS>`/`-dev-stable-<YYYYMMDDHHMMSS>`
   - CI updates `:8.x-stable` to point to the latest weekly build for each minor
 
 - Feature release (manual):
@@ -40,7 +41,7 @@ Note: Production users should still pin to immutable tags even though `:8.x-stab
   4) Publish a GitHub Release using the changelog section
 
 #### Rollback guidance
-- Prefer switching production to a previously validated immutable tag `:8.x-build-<git-sha>` (or a pinned digest)
+- Prefer switching production to a previously validated immutable tag `:8.x-stable-<YYYYMMDDHHMMSS>` (or a pinned digest)
 - Avoid relying on moving tags (`:latest`, `:stable`) for rollbacks
 
 #### Notes
