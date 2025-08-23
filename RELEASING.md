@@ -5,6 +5,7 @@ This document defines how we ship images, manage tags, and write changelogs.
 #### Image tags (summary)
 - Moving tags (mutable): `:8.3-latest`, `:8.4-latest`, `:8.3-dev-latest`, `:8.4-dev-latest`, `:8.x-stable`
 - Immutable (per build): `:8.3-stable-<YYYYMMDD>`, `:8.4-stable-<YYYYMMDD>`, `:8.3-dev-stable-<YYYYMMDD>`, `:8.4-dev-stable-<YYYYMMDD>`, and full PHP engine tags like `:8.3.11` (prod) and `:8.3.11-dev` (dev)
+  - CI sets `BUILD_DATE=$(date +%Y%m%d)` to generate the `<YYYYMMDD>` suffix
 
 Production consumers should use immutable per-build tags (or digests). Moving tags are for convenience/testing.
 
