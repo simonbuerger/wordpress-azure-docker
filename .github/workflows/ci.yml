@@ -13,6 +13,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Install PHP dependencies
+        working-directory: wordpress-plugin/wordpress-azure-monitor
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPUnit
+        working-directory: wordpress-plugin/wordpress-azure-monitor
+        run: vendor/bin/phpunit
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

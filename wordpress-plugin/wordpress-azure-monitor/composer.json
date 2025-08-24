@@ -1,0 +1,8 @@
+{
+    "name": "wordpress-azure-monitor/plugin",
+    "type": "project",
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "wp-phpunit/wp-phpunit": "^6.0"
+    }
+}
