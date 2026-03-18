@@ -22,6 +22,7 @@ jobs:
     env:
       REGISTRY: docker.io
       IMAGE_NAME: bluegrassdigital/wordpress-azure-sync
+      GHCR_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/wordpress-azure-sync
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -50,6 +51,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
       - name: Build and push (prod, multi-arch)
         id: build_prod
         uses: docker/build-push-action@v6
@@ -66,8 +74,11 @@ jobs:
           provenance: false
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-latest
+            ${{ env.GHCR_IMAGE_NAME }}:${{ matrix.php_version }}-latest
             ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
+            ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-stable', env.GHCR_IMAGE_NAME, matrix.php_version) || '' }}
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-stable-${{ env.BUILD_DATE }}
+            ${{ env.GHCR_IMAGE_NAME }}:${{ matrix.php_version }}-stable-${{ env.BUILD_DATE }}
 
       - name: Build and push (dev, multi-arch)
         id: build_dev
@@ -85,7 +96,9 @@ jobs:
           provenance: false
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.php_version }}-dev-latest
+            ${{ env.GHCR_IMAGE_NAME }}:${{ matrix.php_version }}-dev-latest
             ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-dev-stable', env.IMAGE_NAME, matrix.php_version) || '' }}
+            ${{ (github.ref_type == 'tag' || github.event_name == 'schedule') && format('{0}:{1}-dev-stable', env.GHCR_IMAGE_NAME, matrix.php_version) || '' }}
       - name: Resolve full PHP version from prod image
         id: phpver_prod
         env:
@@ -106,17 +119,21 @@ jobs:
       - name: Add tag with full PHP version (prod, multi-arch)
         env:
           IMAGE: ${{ env.IMAGE_NAME }}
+          GHCR_IMAGE: ${{ env.GHCR_IMAGE_NAME }}
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then \
             docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_prod.outputs.full }} $IMAGE:${{ matrix.php_version }}-stable-${{ env.BUILD_DATE }}; \
+            docker buildx imagetools create --tag $GHCR_IMAGE:${{ steps.phpver_prod.outputs.full }} $GHCR_IMAGE:${{ matrix.php_version }}-stable-${{ env.BUILD_DATE }}; \
           fi
 
       - name: Add tag with full PHP version (dev, multi-arch)
         if: ${{ github.ref_type == 'tag' }}
         env:
           IMAGE: ${{ env.IMAGE_NAME }}
+          GHCR_IMAGE: ${{ env.GHCR_IMAGE_NAME }}
         run: |
           docker buildx imagetools create --tag $IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $IMAGE:${{ matrix.php_version }}-dev-stable
+          docker buildx imagetools create --tag $GHCR_IMAGE:${{ steps.phpver_dev.outputs.full }}-dev $GHCR_IMAGE:${{ matrix.php_version }}-dev-stable
 
       - name: Trivy scan (prod - json)
         uses: aquasecurity/trivy-action@0.35.0
