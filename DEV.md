@@ -39,3 +39,6 @@ docker compose exec --user www-data -w /home/site/wwwroot wordpress wp plugin li
 - No admin bar badge: ensure plugin is active and check `/home/LogFiles/sync` logs.
 
 
+#### Pre-commit hooks
+- Install pre-commit (https://pre-commit.com/)
+- Run `pre-commit install` to set up git hooks

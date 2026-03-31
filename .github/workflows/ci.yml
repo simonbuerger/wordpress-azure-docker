@@ -7,6 +7,29 @@ on:
     branches: [ master ]
 
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install pre-commit
+        run: pip install pre-commit
+      - name: Run pre-commit on changed files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="origin/${{ github.base_ref }}"
+          else
+            base_ref="HEAD^"
+          fi
+          git fetch origin ${{ github.base_ref }} --depth=1 || true
+          files=$(git diff --name-only --diff-filter=AMR "$base_ref")
+          if [ -n "$files" ]; then
+            pre-commit run --files $files
+          fi
   build-and-test:
     runs-on: ubuntu-latest
     steps:
